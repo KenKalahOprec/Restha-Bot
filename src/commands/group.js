@@ -367,17 +367,36 @@ export async function handleGroup(sock, m, { jid, isGroup, cmd, args, q, msgType
 
     case 'getcontact':
     case 'savecontact': {
-      const user = m.message?.extendedTextMessage?.contextInfo?.mentionedJid?.[0] || (quoted ? (quoted.sender || m.message?.extendedTextMessage?.contextInfo?.participant) : null);
-      if (!user) return sock.sendMessage(jid, { text: 'Tag atau reply pesan anggota yang ingin diambil kontaknya.' }, { quoted: m });
-      const num = user.split('@')[0];
+      let targetUser = m.message?.extendedTextMessage?.contextInfo?.mentionedJid?.[0] || (quoted ? (quoted.sender || m.message?.extendedTextMessage?.contextInfo?.participant) : null);
+      if (!targetUser && args?.[0]) {
+        const raw = args[0].replace(/[^0-9]/g, '');
+        if (raw) targetUser = (raw.startsWith('0') ? '62' + raw.slice(1) : raw) + '@s.whatsapp.net';
+      }
+      if (!targetUser) return sock.sendMessage(jid, { text: 'Tag atau reply pesan anggota yang ingin diambil kontaknya.' }, { quoted: m });
+
+      let resolvedJid = targetUser;
+      if (targetUser.endsWith('@lid')) {
+        try {
+          const groupMeta = await sock.groupMetadata(jid);
+          const member = groupMeta.participants?.find(p => p.lid === targetUser || p.id === targetUser);
+          if (member?.id) resolvedJid = member.id;
+        } catch {}
+      }
+
+      let phoneNum = resolvedJid.split('@')[0].split(':')[0].replace(/[^0-9]/g, '');
+      if (phoneNum.startsWith('0')) {
+        phoneNum = '62' + phoneNum.slice(1);
+      }
+
       const vcard = 'BEGIN:VCARD\n'
-        + 'VERSION:3.0\n' 
-        + `FN:${num}\n`
-        + `TEL;type=CELL;type=VOICE;waid=${num}:+${num}\n`
+        + 'VERSION:3.0\n'
+        + `FN:+${phoneNum}\n`
+        + `TEL;type=CELL;type=VOICE;waid=${phoneNum}:+${phoneNum}\n`
         + 'END:VCARD';
+
       await sock.sendMessage(jid, {
         contacts: {
-          displayName: num,
+          displayName: `+${phoneNum}`,
           contacts: [{ vcard }]
         }
       }, { quoted: m });

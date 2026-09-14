@@ -58,6 +58,7 @@ export const GALLERY_PACKS = {
   nsfwboobs:    { type: 'image' },
   nsfwneko:     { type: 'image' },
   nsfwanal:     { type: 'image' },
+  nsfwloli:     { blocked: true },
 };
 
 const NSFW_DIRECT_APIS = {
@@ -66,12 +67,27 @@ const NSFW_DIRECT_APIS = {
   nsfwblowjob: async () => (await (await fetch('https://nekobot.xyz/api/image?type=blowjob', { signal: AbortSignal.timeout(10000) })).json())?.message,
   nsfwpussy:   async () => (await (await fetch('https://nekobot.xyz/api/image?type=pussy', { signal: AbortSignal.timeout(10000) })).json())?.message,
   nsfwzettai:  async () => (await (await fetch('https://nekobot.xyz/api/image?type=hthigh', { signal: AbortSignal.timeout(10000) })).json())?.message,
-  hentai:      async () => (await (await fetch('https://nekobot.xyz/api/image?type=hentai', { signal: AbortSignal.timeout(10000) })).json())?.message,
+  hentai:      async () => {
+    try {
+      const res = await fetch('https://nekobot.xyz/api/image?type=hentai', { signal: AbortSignal.timeout(10000) });
+      const data = await res.json();
+      if (data?.message) return data.message;
+    } catch {}
+    const res2 = await fetch('https://nekobot.xyz/api/image?type=hboobs', { signal: AbortSignal.timeout(10000) });
+    return (await res2.json())?.message;
+  },
   paizuri:     async () => (await (await fetch('https://nekobot.xyz/api/image?type=paizuri', { signal: AbortSignal.timeout(10000) })).json())?.message,
   nsfwass:     async () => (await (await fetch('https://nekobot.xyz/api/image?type=hass', { signal: AbortSignal.timeout(10000) })).json())?.message,
   nsfwboobs:   async () => (await (await fetch('https://nekobot.xyz/api/image?type=hboobs', { signal: AbortSignal.timeout(10000) })).json())?.message,
   nsfwneko:    async () => (await (await fetch('https://nekobot.xyz/api/image?type=neko', { signal: AbortSignal.timeout(10000) })).json())?.message,
-  nsfwanal:    async () => (await (await fetch('https://nekobot.xyz/api/image?type=anal', { signal: AbortSignal.timeout(10000) })).json())?.message,
+  nsfwanal:    async () => {
+    try {
+      const res = await fetch('https://nekobot.xyz/api/image?type=anal', { signal: AbortSignal.timeout(10000) });
+      const data = await res.json();
+      if (data?.message) return data.message;
+    } catch {}
+    return null;
+  },
 };
 
 const cache = new Map();
@@ -88,6 +104,10 @@ async function fetchPack(packUrl) {
 export async function handleGallery(sock, m, { jid, cmd }) {
   const pack = GALLERY_PACKS[cmd];
   if (!pack) return;
+
+  if (pack.blocked) {
+    return sock.sendMessage(jid, { text: '❌ Permintaan ditolak: Konten eksplisit karakter di bawah umur (loli/shota) dilarang keras.' }, { quoted: m });
+  }
 
   try {
     let mediaUrl = null;
@@ -130,15 +150,26 @@ export async function handleGallery(sock, m, { jid, cmd }) {
 
     if (!mediaUrl) throw new Error('URL media tidak ditemukan');
 
-    const res = await fetch(mediaUrl, { signal: AbortSignal.timeout(20000) });
+    const headers = {
+      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+      'Accept': 'image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8'
+    };
+
+    let res;
+    try {
+      res = await fetch(mediaUrl, { headers, signal: AbortSignal.timeout(20000) });
+    } catch {
+      res = await fetch(mediaUrl, { headers, signal: AbortSignal.timeout(20000) });
+    }
+
     if (!res.ok) throw new Error('Gagal mengunduh media');
     const buf = Buffer.from(await res.arrayBuffer());
 
     const isGif = mediaUrl.endsWith('.gif') || res.headers.get('content-type')?.includes('gif');
-    if (pack.type === 'video' || isGif) {
-      await sock.sendMessage(jid, { video: buf, mimetype: isGif ? 'image/gif' : 'video/mp4', gifPlayback: isGif, caption: `[${cmd}]` }, { quoted: m });
+    if (pack.type === 'video') {
+      await sock.sendMessage(jid, { video: buf, mimetype: 'video/mp4', caption: `[${cmd}]` }, { quoted: m });
     } else {
-      await sock.sendMessage(jid, { image: buf, caption: `[${cmd}]` }, { quoted: m });
+      await sock.sendMessage(jid, { image: buf, mimetype: isGif ? 'image/gif' : 'image/jpeg', caption: `[${cmd}]` }, { quoted: m });
     }
   } catch (err) {
     await sock.sendMessage(jid, { text: `[ERROR] ${err.message}` }, { quoted: m });

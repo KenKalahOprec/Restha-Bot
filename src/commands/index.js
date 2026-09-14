@@ -168,10 +168,26 @@ export async function dispatchCommand(sock, m, context) {
     case 'galeri':
     case 'menumd':
     case 'mdmenu':
-    case 'md':
     case 'menunsfw':
     case 'nsfwmenu':
-    case 'nsfw':
+      return handleMenu(sock, m, context);
+
+    case 'nsfw': {
+      const sub = context.args?.[0]?.toLowerCase();
+      if (sub === 'on' || sub === 'off') {
+        return handleGroup(sock, m, context);
+      }
+      if (sub) {
+        if (sub === 'loli') {
+          return sock.sendMessage(jid, { text: '❌ Permintaan ditolak: Konten eksplisit karakter di bawah umur (loli/shota) dilarang keras.' }, { quoted: m });
+        }
+        const resolvedCmd = GALLERY_PACKS[sub] ? sub : (GALLERY_PACKS['nsfw' + sub] ? 'nsfw' + sub : null);
+        if (resolvedCmd) {
+          return handleGallery(sock, m, { ...context, cmd: resolvedCmd });
+        }
+      }
+      return handleMenu(sock, m, { ...context, cmd: 'menunsfw' });
+    }
     case 'menuextras':
     case 'menuextra':
     case 'extrasmenu':
@@ -545,7 +561,6 @@ export async function dispatchCommand(sock, m, context) {
     case 'delvote':
     case 'antivirus':
     case 'antitoxic':
-    case 'nsfw':
     case 'react':
     case 'getjoinrequest':
       return handleGroup(sock, m, context);
