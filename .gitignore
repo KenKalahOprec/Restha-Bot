@@ -22,6 +22,8 @@ pnpm-debug.log*
 .env
 .env.*
 !.env.example
+config.js
+!config.example.js
 
 # OS & Editor files
 .DS_Store
@@ -29,3 +31,4 @@ Thumbs.db
 *.tmp
 *.raw
 bin/
+
