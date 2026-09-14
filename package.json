@@ -1,0 +1,21 @@
+{
+  "name": "whatsapp-selfbot",
+  "version": "1.0.0",
+  "type": "module",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js"
+  },
+  "dependencies": {
+    "@chirag127/oz-ai": "^0.3.3",
+    "@distube/ytdl-core": "^4.16.10",
+    "@ffmpeg-installer/ffmpeg": "^1.1.0",
+    "@whiskeysockets/baileys": "^6.7.13",
+    "cheerio": "^1.2.0",
+    "fluent-ffmpeg": "^2.1.3",
+    "pino": "^9.6.0",
+    "qrcode-terminal": "^0.12.0",
+    "wa-sticker-formatter": "^4.4.4",
+    "yt-dlp-exec": "^1.0.2"
+  }
+}
