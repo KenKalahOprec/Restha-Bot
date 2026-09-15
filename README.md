@@ -125,8 +125,8 @@ restha-bot/
     │   ├── menu.js                # Handler tampilan menu help 15 kategori interaktif
     │   ├── owner.js               # Handler restart, shutdown, whitelist, broadcast
     │   ├── religion.js            # Handler Al-Qur'an, Jadwal Sholat, Alkitab, Gita
-    │   ├── search.js              # Handler Google, Wiki, BudayaBali, WatchHentai SNI
-    │   └── tools.js               # Handler compiler kode, remini, toURL, OCR, TTS
+    │   ├── search.js                  # Handler Search, BudayaBali, Lustpress, Tomoe, & nHentai PDF
+    │   └── tools.js                   # Handler compiler kode, remini, toURL, OCR, TTS
     ├── handlers/                  # Event listener socket Baileys
     │   ├── group.js               # Listener event member join/leave & update grup
     │   └── message.js             # Interceptor pesan, anti-spam, relay Menfess & whitelist
@@ -487,6 +487,8 @@ Ikuti langkah-langkah berikut untuk memasang dan menjalankan bot pada environmen
 - [x] Sistem pesan anonim Menfess timbal balik (dua arah)
 - [x] Bypass DNS untuk pengikis konten anime & gambar
 - [x] Perintah restart & shutdown proses jarak jauh
+- [x] Multi-provider R18 Video Aggregator & 360p Downloader (Lustpress: Eporner, XNXX, PornHub)
+- [x] Multi-provider Doujinshi Reader & Auto-PDF Compiler (Tomoe: nHentai, Pururin, HentaiFox)
 - [ ] Dashboard pemantauan status bot berbasis web
 - [ ] Dukungan multi-sesi perangkat bersamaan
 
