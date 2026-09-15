@@ -247,7 +247,6 @@ Ikuti langkah-langkah berikut untuk memasang dan menjalankan bot pada environmen
 | Perintah | Shortcut | Parameter | Deskripsi |
 |---|---|---|---|
 | `.draw` | `.genimg`, `.gptimage` | `<deskripsi>` | Menghasilkan gambar ilustrasi AI (GPT-Image 2.5 Engine) |
-| `.lasermeme` | `.meme`, `.lasereyes` | `<teks>` | Membuat stiker meme laser eyes, flowchart, & efek elemen (reply foto) |
 | `.c` | `.cpp`, `.c++` | `<kode / reply>` | Menjalankan dan mengompilasi kode C/C++ |
 | `.run` | `.code` | `<bahasa> <kode>`| Menjalankan kode multi-bahasa pemrograman |
 | `.py` | - | `<kode Python>` | Menjalankan skrip Python 3 secara terisolasi |

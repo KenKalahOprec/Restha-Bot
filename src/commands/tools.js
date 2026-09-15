@@ -528,11 +528,6 @@ export async function handleDraw(sock, m, { jid, q, cmd }) {
   let referenceImageUrl = null;
 
   if (isImg || isQuotedImg) {
-    // If prompt is meme/laser related, route to handleLaserMeme
-    if (rawPrompt.toLowerCase().includes('laser') || rawPrompt.toLowerCase().includes('meme')) {
-      return handleLaserMeme(sock, m, { jid, q: rawPrompt, cmd, msgType, quoted });
-    }
-
     try {
       const mediaMsg = isImg ? m : { message: quoted.raw, key: m.key };
       const rawBuf = await downloadMediaMessage(mediaMsg, 'buffer', {});
@@ -590,60 +585,5 @@ export async function handleDraw(sock, m, { jid, q, cmd }) {
   }
 }
 
-export async function handleLaserMeme(sock, m, { jid, q, cmd, msgType, quoted }) {
-  const isImg = msgType === 'imageMessage';
-  const isQuotedImg = quoted?.type === 'imageMessage';
-
-  if (!isImg && !isQuotedImg) {
-    return sock.sendMessage(jid, {
-      text: `🔥 *[ LASER EYES MEME GENERATOR ]*\n\n` +
-        `Kirim atau balas foto dengan:\n` +
-        `*${config.prefix}${cmd} <teks meme> [elemen]*\n\n` +
-        `*Contoh Penggunaan:*\n` +
-        `• ${config.prefix}${cmd} BEDAKAN MODEL SAMA BAGIAN DIK!\n` +
-        `• ${config.prefix}${cmd} JANGAN MAIN-MAIN DEK! --petir\n` +
-        `• ${config.prefix}${cmd} DINGIN BANGET HATI INI --air\n\n` +
-        `*Pilihan Elemen:*\n` +
-        `• \`--api\` / (default) : Latar api membara, flowchart SPBE, laser merah\n` +
-        `• \`--air\`             : Latar pusaran air dingin, sirkuit cyan, laser es\n` +
-        `• \`--petir\`           : Latar badai halilintar, kilatan ungu, laser petir`
-    }, { quoted: m });
-  }
-
-  let text = q || 'BEDAKAN MODEL SAMA BAGIAN DIK!';
-  let element = 'api';
-
-  if (text.includes('--air') || text.includes('--water')) {
-    element = 'air';
-    text = text.replace(/--air|--water/gi, '').trim();
-  } else if (text.includes('--petir') || text.includes('--lightning')) {
-    element = 'petir';
-    text = text.replace(/--petir|--lightning/gi, '').trim();
-  } else if (text.includes('--api') || text.includes('--fire')) {
-    element = 'api';
-    text = text.replace(/--api|--fire/gi, '').trim();
-  }
-
-  if (!text) text = 'BEDAKAN MODEL SAMA BAGIAN DIK!';
-
-  await sock.sendMessage(jid, { text: `⚡ Sedang merender meme stiker Laser Eyes (${element.toUpperCase()})...` }, { quoted: m });
-
-  try {
-    const mediaMsg = isImg ? m : { message: quoted.raw, key: m.key };
-    const rawBuf = await downloadMediaMessage(mediaMsg, 'buffer', {});
-
-    const { generateLaserMeme } = await import('../libs/laserMeme.js');
-    const memeBuf = await generateLaserMeme(rawBuf, text, element);
-
-    await sock.sendMessage(jid, {
-      image: memeBuf,
-      caption: `🔥 *[ LASER MEME STICKER ]*\n\n` +
-        `📝 *Teks  :* "${text}"\n` +
-        `⚡ *Elemen:* ${element.toUpperCase()}`
-    }, { quoted: m });
-  } catch (err) {
-    await sock.sendMessage(jid, { text: `❌ Gagal membuat Laser Meme: ${err.message}` }, { quoted: m });
-  }
-}
 
 

@@ -82,7 +82,6 @@ export async function handleMenu(sock, m, { jid, cmd, args, userName }) {
 
     tools: `┌── [ 04. TOOLS & COMPILER ]
 │ • ${p}draw | ${p}genimg | ${p}gptimage <deskripsi>
-│ • ${p}lasermeme | ${p}meme <teks> (reply foto)
 │ • ${p}c | ${p}cpp | ${p}c++ <kode c/c++ / reply>
 │ • ${p}run | ${p}code <bahasa> <kode / reply>
 │ • ${p}py | ${p}js | ${p}ts | ${p}go | ${p}rs | ${p}java <kode>

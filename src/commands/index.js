@@ -53,8 +53,7 @@ import {
   handleCpp,
   handleCodeRunner,
   handleTextEffect,
-  handleDraw,
-  handleLaserMeme
+  handleDraw
 } from './tools.js';
 import {
   handleGoogle,
@@ -439,13 +438,6 @@ export async function dispatchCommand(sock, m, context) {
     case 'genimg':
     case 'gptimage':
       return handleDraw(sock, m, context);
-
-    // Laser Eyes Meme Generator (Meme Compositor)
-    case 'lasermeme':
-    case 'meme':
-    case 'lasereyes':
-    case 'apimeme':
-      return handleLaserMeme(sock, m, context);
 
     // 6. Search
     case 'google':
