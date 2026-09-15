@@ -495,6 +495,12 @@ export async function dispatchCommand(sock, m, context) {
     case 'pornhub':
     case 'ph':
     case 'eporner':
+    case 'lpdl':
+    case 'lustpressdl':
+    case 'xnxxdl':
+    case 'phdl':
+    case 'pornhubdl':
+    case 'epornerdl':
       return handleLustpress(sock, m, context);
     case 'tomoe':
     case 'tomo':

@@ -1,6 +1,10 @@
 import config from '../../config.js';
 import https from 'https';
+import fs from 'fs';
+import path from 'path';
+import os from 'os';
 import ytdlp from 'yt-dlp-exec';
+import ffmpegInstaller from '@ffmpeg-installer/ffmpeg';
 import PDFDocument from 'pdfkit';
 import sharp from 'sharp';
 import { searchImage, downloadVideoWithMeta } from '../libs/media.js';
@@ -586,26 +590,157 @@ export async function handleWatchHentai(sock, m, { jid, q, cmd }) {
   }
 }
 
-// ─── Lustpress (R18 Video Search: Eporner, XNXX, PornHub) ───────────────────
+// Helper download video 18+ resolusi 360p
+export async function downloadAdultVideo360p(targetUrl) {
+  const tmpOut = path.join(os.tmpdir(), `adult360_${Date.now()}_${Math.random().toString(36).slice(2)}.mp4`);
+  
+  let meta = null;
+  try {
+    meta = await ytdlp(targetUrl, { dumpSingleJson: true, noPlaylist: true });
+  } catch {}
+
+  await ytdlp(targetUrl, {
+    format: 'bestvideo[height<=360][ext=mp4]+bestaudio[ext=m4a]/best[height<=360][ext=mp4]/best[height<=360]/best',
+    ffmpegLocation: ffmpegInstaller.path,
+    output: tmpOut,
+    noPlaylist: true
+  });
+
+  const buffer = await fs.promises.readFile(tmpOut);
+  await fs.promises.unlink(tmpOut).catch(() => {});
+  return { buffer, meta };
+}
+
+// ─── Lustpress (R18 Video Search & 360p Downloader: Eporner, XNXX, PornHub) ─
 export async function handleLustpress(sock, m, { jid, q, cmd, args }) {
-  if (!q) {
+  const isDl = cmd.includes('dl') || args?.includes('--dl') || (args?.[0] || '').toLowerCase() === 'dl';
+
+  if (!q && !isDl) {
     return sock.sendMessage(jid, {
       text: `🔞 *[ LUSTPRESS 18+ UNIFIED AGGREGATOR ]*\n\n` +
-        `Pencarian multi-provider video 18+ dalam satu endpoint:\n\n` +
-        `• *Format:* ${config.prefix}${cmd} [provider] <kata kunci>\n\n` +
+        `Pencarian & unduh multi-provider video 18+ dalam satu endpoint:\n\n` +
+        `• *Format Cari:* ${config.prefix}${cmd} [provider] <kata kunci>\n` +
+        `• *Format Unduh (360p):* ${config.prefix}lpdl <url / query>\n\n` +
         `*Daftar Provider:* \n` +
         `1. *eporner* (default, HD + thumbnail)\n` +
-        `   Contoh: ${config.prefix}${cmd} cosplay\n` +
-        `   Atau: ${config.prefix}${cmd} eporner cosplay\n\n` +
+        `   Cari : ${config.prefix}${cmd} cosplay\n` +
+        `   Unduh: ${config.prefix}lpdl cosplay (atau ${config.prefix}epornerdl <query>)\n\n` +
         `2. *xnxx* (database xnxx)\n` +
-        `   Contoh: ${config.prefix}${cmd} xnxx makima\n\n` +
+        `   Cari : ${config.prefix}${cmd} xnxx makima\n` +
+        `   Unduh: ${config.prefix}xnxxdl makima\n\n` +
         `3. *pornhub* / *ph* (database pornhub)\n` +
-        `   Contoh: ${config.prefix}${cmd} ph anime\n\n` +
-        `_Bisa juga langsung menggunakan perintah: .xnxx <query> atau .pornhub <query>_`
+        `   Cari : ${config.prefix}${cmd} ph anime\n` +
+        `   Unduh: ${config.prefix}phdl anime\n\n` +
+        `_Direct shortcuts: .xnxx, .pornhub, .eporner, .lpdl, .xnxxdl, .phdl, .epornerdl_`
     }, { quoted: m });
   }
 
   const warnHeader = `🔞 *[WARNING 18+ RESTRICTED CONTENT]*\n_Lustpress R18 Video Aggregator_\n────────────────────\n`;
+
+  // ─── MODE DOWNLOAD (360p) ───
+  if (isDl) {
+    let rawTarget = q ? q.replace(/--dl/g, '').replace(/\bdl\b/gi, '').trim() : '';
+    if (!rawTarget) {
+      return sock.sendMessage(jid, {
+        text: `⚠️ Masukkan tautan video atau kata kunci pencarian yang ingin diunduh (360p).\n\n` +
+          `Contoh:\n` +
+          `• Link langsung : ${config.prefix}lpdl https://www.eporner.com/video-...\n` +
+          `• Cari otomatis : ${config.prefix}lpdl cosplay\n` +
+          `• XNXX          : ${config.prefix}xnxxdl makima`
+      }, { quoted: m });
+    }
+
+    let targetUrl = '';
+    let dlProvider = 'eporner';
+
+    if (/^https?:\/\//i.test(rawTarget)) {
+      targetUrl = rawTarget;
+      if (targetUrl.includes('xnxx.com')) dlProvider = 'xnxx';
+      else if (targetUrl.includes('pornhub.com')) dlProvider = 'pornhub';
+      else if (targetUrl.includes('eporner.com')) dlProvider = 'eporner';
+      else dlProvider = 'video';
+    } else {
+      const firstW = (args?.[0] || '').toLowerCase();
+      if (cmd.includes('xnxx') || firstW === 'xnxx') {
+        dlProvider = 'xnxx';
+        rawTarget = rawTarget.replace(/\bxnxx\b/gi, '').trim();
+      } else if (cmd.includes('ph') || cmd.includes('pornhub') || firstW === 'ph' || firstW === 'pornhub') {
+        dlProvider = 'pornhub';
+        rawTarget = rawTarget.replace(/\b(pornhub|ph)\b/gi, '').trim();
+      } else if (cmd.includes('eporner') || firstW === 'eporner') {
+        dlProvider = 'eporner';
+        rawTarget = rawTarget.replace(/\beporner\b/gi, '').trim();
+      }
+
+      await sock.sendMessage(jid, {
+        text: `${warnHeader}🔍 Mencari video teratas di *${dlProvider.toUpperCase()}* untuk: "${rawTarget}"...`
+      }, { quoted: m });
+
+      try {
+        if (dlProvider === 'xnxx') {
+          const sRes = await fetch(`https://r.jina.ai/https://www.xnxx.com/search/${encodeURIComponent(rawTarget)}`, { signal: AbortSignal.timeout(15000) });
+          const sText = await sRes.text();
+          const match = sText.match(/https:\/\/www\.xnxx\.com\/video-[^\s\)]+/);
+          if (!match) throw new Error(`Tidak ditemukan video di XNXX untuk "${rawTarget}"`);
+          targetUrl = match[0];
+        } else if (dlProvider === 'pornhub') {
+          const sRes = await fetch(`https://r.jina.ai/https://www.pornhub.com/video/search?search=${encodeURIComponent(rawTarget)}`, { signal: AbortSignal.timeout(15000) });
+          const sText = await sRes.text();
+          const match = sText.match(/https:\/\/www\.pornhub\.com\/view_video\.php\?viewkey=[a-zA-Z0-9]+/);
+          if (!match) throw new Error(`Tidak ditemukan video di PornHub untuk "${rawTarget}"`);
+          targetUrl = match[0];
+        } else {
+          const sRes = await fetch(`https://www.eporner.com/api/v2/video/search/?query=${encodeURIComponent(rawTarget)}&per_page=1`, {
+            headers: { 'User-Agent': 'Mozilla/5.0' },
+            signal: AbortSignal.timeout(10000)
+          });
+          const sData = await sRes.json();
+          if (!sData?.videos?.length) throw new Error(`Tidak ditemukan video di Eporner untuk "${rawTarget}"`);
+          targetUrl = sData.videos[0].url;
+        }
+      } catch (err) {
+        return sock.sendMessage(jid, { text: `${warnHeader}❌ Gagal menemukan URL video: ${err.message}` }, { quoted: m });
+      }
+    }
+
+    await sock.sendMessage(jid, {
+      text: `${warnHeader}⏳ *[LUSTPRESS DOWNLOADER 360P]*\nSedang mengunduh video dari *${dlProvider.toUpperCase()}*...\n🔗 *URL:* ${targetUrl}\n_Kualitas: 360p (Cepat & Hemat Kuota). Mohon tunggu sebentar..._`
+    }, { quoted: m });
+
+    try {
+      const { buffer, meta } = await downloadAdultVideo360p(targetUrl);
+      const title = meta?.title || `${dlProvider}_video`;
+      const duration = meta?.duration_string || (meta?.duration ? `${meta.duration}s` : '-');
+      const cleanTitle = title.replace(/[\\/:*?"<>|]/g, '_').slice(0, 60);
+      const sizeMb = (buffer.length / (1024 * 1024)).toFixed(2);
+
+      const caption = `${warnHeader}🎬 *[LUSTPRESS VIDEO 360P]*\n\n` +
+        `📌 *Judul:* ${title}\n` +
+        `⏱️ *Durasi:* ${duration}\n` +
+        `📦 *Ukuran:* ${sizeMb} MB\n` +
+        `🌐 *Sumber:* ${targetUrl}\n\n` +
+        `_Selamat menonton!_`;
+
+      if (buffer.length <= 64 * 1024 * 1024) {
+        return await sock.sendMessage(jid, { video: buffer, caption }, { quoted: m });
+      } else if (buffer.length <= 100 * 1024 * 1024) {
+        return await sock.sendMessage(jid, {
+          document: buffer,
+          mimetype: 'video/mp4',
+          fileName: `${cleanTitle}.mp4`,
+          caption
+        }, { quoted: m });
+      } else {
+        return await sock.sendMessage(jid, {
+          text: `${warnHeader}⚠️ Ukuran video melebihi batas 100 MB (${sizeMb} MB).\nSilakan tonton langsung di: ${targetUrl}`
+        }, { quoted: m });
+      }
+    } catch (err) {
+      return await sock.sendMessage(jid, {
+        text: `${warnHeader}❌ Gagal mengunduh video: ${err.message}`
+      }, { quoted: m });
+    }
+  }
 
   // Deteksi provider dari prefix command atau argument pertama
   let provider = 'eporner';
@@ -666,6 +801,7 @@ export async function handleLustpress(sock, m, { jid, q, cmd, args }) {
       items.forEach((it, idx) => {
         caption += `*${idx + 1}. ${it.title}*\n  🔗 ${it.url}\n\n`;
       });
+      caption += `📥 _Download video 360p: ${config.prefix}lpdl <url>_`;
 
       if (items[0]?.thumb) {
         try {
@@ -708,6 +844,7 @@ export async function handleLustpress(sock, m, { jid, q, cmd, args }) {
       items.forEach((it, idx) => {
         caption += `*${idx + 1}. ${it.title}*\n  🔗 ${it.url}\n\n`;
       });
+      caption += `📥 _Download video 360p: ${config.prefix}lpdl <url>_`;
 
       return await sock.sendMessage(jid, { text: caption }, { quoted: m });
     } catch (err) {
@@ -744,6 +881,8 @@ export async function handleLustpress(sock, m, { jid, q, cmd, args }) {
         text += `\n*${idx + 2}. ${v.title}*\n  ⏱️ ${v.length_min || '-'} | 👁️ ${v.views?.toLocaleString('id-ID') || '-'}\n  🔗 ${v.url}\n`;
       });
     }
+
+    text += `\n📥 _Download video 360p: ${config.prefix}lpdl <url>_`;
 
     const thumbUrl = first.default_thumb?.src || first.thumbs?.[0]?.src;
     if (thumbUrl) {

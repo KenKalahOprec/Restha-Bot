@@ -443,6 +443,10 @@ Ikuti langkah-langkah berikut untuk memasang dan menjalankan bot pada environmen
 | `.xnxx` | - | `<query>` | Shortcut pencarian video dewasa di database XNXX |
 | `.pornhub` | `.ph` | `<query>` | Shortcut pencarian video dewasa di database PornHub |
 | `.eporner` | - | `<query>` | Shortcut pencarian video dewasa di database Eporner |
+| `.lpdl` | `.lustpressdl` | `<url / query>` | Mengunduh video dewasa 360p dari Eporner, XNXX, atau PornHub |
+| `.xnxxdl` | - | `<url / query>` | Mengunduh video XNXX resolusi 360p (link langsung / cari judul) |
+| `.phdl` | `.pornhubdl` | `<url / query>` | Mengunduh video PornHub resolusi 360p (link langsung / cari judul) |
+| `.epornerdl`| - | `<url / query>` | Mengunduh video Eporner resolusi 360p (link langsung / cari judul) |
 | `.tomoe` | `.doujin` | `[provider] <query/code>` | Unified doujinshi aggregator (nHentai, Pururin, HentaiFox) |
 | `.nhentai` | `.nh` | `<kode / query>` | Detail & cover doujin nHentai atau pencarian 5 judul teratas |
 | `.nhpdf` | `.tomoepdf` | `<kode>` | Mengunduh seluruh halaman doujin dan mengompilasinya jadi PDF |
