@@ -367,15 +367,19 @@ export async function handleGroup(sock, m, { jid, isGroup, cmd, args, q, msgType
 
     case 'getcontact':
     case 'savecontact': {
-      let targetUser = m.message?.extendedTextMessage?.contextInfo?.mentionedJid?.[0] || (quoted ? (quoted.sender || m.message?.extendedTextMessage?.contextInfo?.participant) : null);
+      let targetUser = m.message?.extendedTextMessage?.contextInfo?.mentionedJid?.[0]
+        || (quoted ? (quoted.sender || m.message?.extendedTextMessage?.contextInfo?.participant) : null);
+
       if (!targetUser && args?.[0]) {
-        const raw = args[0].replace(/[^0-9]/g, '');
-        if (raw) targetUser = (raw.startsWith('0') ? '62' + raw.slice(1) : raw) + '@s.whatsapp.net';
+        let raw = args[0].replace(/[^0-9]/g, '');
+        if (raw.startsWith('0')) raw = '62' + raw.slice(1);
+        else if (raw.startsWith('8')) raw = '62' + raw;
+        if (raw) targetUser = `${raw}@s.whatsapp.net`;
       }
       if (!targetUser) return sock.sendMessage(jid, { text: 'Tag atau reply pesan anggota yang ingin diambil kontaknya.' }, { quoted: m });
 
       let resolvedJid = targetUser;
-      if (targetUser.endsWith('@lid')) {
+      if (targetUser.endsWith('@lid') && isGroup) {
         try {
           const groupMeta = await sock.groupMetadata(jid);
           const member = groupMeta.participants?.find(p => p.lid === targetUser || p.id === targetUser);
@@ -386,6 +390,8 @@ export async function handleGroup(sock, m, { jid, isGroup, cmd, args, q, msgType
       let phoneNum = resolvedJid.split('@')[0].split(':')[0].replace(/[^0-9]/g, '');
       if (phoneNum.startsWith('0')) {
         phoneNum = '62' + phoneNum.slice(1);
+      } else if (phoneNum.startsWith('8')) {
+        phoneNum = '62' + phoneNum;
       }
 
       const vcard = 'BEGIN:VCARD\n'
@@ -404,11 +410,13 @@ export async function handleGroup(sock, m, { jid, isGroup, cmd, args, q, msgType
     }
 
     case 'sendcontact': {
-      const num = (args[0] || '').replace(/[^0-9]/g, '');
-      const name = args.slice(1).join(' ') || num;
+      let num = (args[0] || '').replace(/[^0-9]/g, '');
+      if (num.startsWith('0')) num = '62' + num.slice(1);
+      else if (num.startsWith('8')) num = '62' + num;
+      const name = args.slice(1).join(' ') || `+${num}`;
       if (!num) return sock.sendMessage(jid, { text: `Format: ${config.prefix}sendcontact <nomor> [nama]` }, { quoted: m });
       const vcard = 'BEGIN:VCARD\n'
-        + 'VERSION:3.0\n' 
+        + 'VERSION:3.0\n'
         + `FN:${name}\n`
         + `TEL;type=CELL;type=VOICE;waid=${num}:+${num}\n`
         + 'END:VCARD';

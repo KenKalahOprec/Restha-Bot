@@ -149,10 +149,11 @@ export default async function messageHandler(sock, m) {
   }
 
   // ─── FITUR MENFESS: INTERCEPT BALASAN ANONIM (Bisa dua arah tanpa harus whitelist) ───
-  if (!isGroup && menfessSessions.has(jid) && textContent && !textContent.startsWith(config.prefix)) {
-    const session = menfessSessions.get(jid);
-    const destinationJid = jid === session.to ? session.from : session.to;
-    const isReplyFromTarget = jid === session.to;
+  const menfessKey = [jid, senderNumber, ...candidateSenders].find(k => k && menfessSessions.has(k));
+  if (!isGroup && menfessKey && textContent && !textContent.startsWith(config.prefix)) {
+    const session = menfessSessions.get(menfessKey);
+    const isReplyFromTarget = jid === session.to || senderNumber === session.to.split('@')[0];
+    const destinationJid = isReplyFromTarget ? session.from : session.to;
 
     const forwardText = isReplyFromTarget
       ? `💬 *[ BALASAN DARI TARGET MENFESS ]*\n\n"${textContent}"\n\n────────────────────\n_Ketik pesan langsung di sini untuk membalas kembali._`
@@ -401,6 +402,8 @@ export default async function messageHandler(sock, m) {
     jid,
     isGroup,
     userName,
+    senderNumber,
+    senderRaw,
     command,
     cmd,
     args,

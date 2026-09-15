@@ -67,7 +67,9 @@ import {
   handleTiktokSearch,
   handleJavSearch,
   handleBudayaBali,
-  handleWatchHentai
+  handleWatchHentai,
+  handleLustpress,
+  handleTomoe
 } from './search.js';
 import { handleGroup } from './group.js';
 import { handleReligion } from './religion.js';
@@ -486,6 +488,28 @@ export async function dispatchCommand(sock, m, context) {
     case 'whentai':
     case 'hentaisearch':
       return handleWatchHentai(sock, m, context);
+    case 'lustpress':
+    case 'lp':
+    case 'r18':
+    case 'xnxx':
+    case 'pornhub':
+    case 'ph':
+    case 'eporner':
+      return handleLustpress(sock, m, context);
+    case 'tomoe':
+    case 'tomo':
+    case 'doujin':
+    case 'doujinshi':
+    case 'nhentai':
+    case 'nh':
+    case 'nhpdf':
+    case 'nhentaipdf':
+    case 'tomoepdf':
+    case 'doujinpdf':
+    case 'pururin':
+    case 'hentaifox':
+    case 'hfox':
+      return handleTomoe(sock, m, context);
 
     // 7. Group Administration
     case 'kick':

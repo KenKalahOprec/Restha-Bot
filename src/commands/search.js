@@ -1,6 +1,8 @@
 import config from '../../config.js';
 import https from 'https';
 import ytdlp from 'yt-dlp-exec';
+import PDFDocument from 'pdfkit';
+import sharp from 'sharp';
 import { searchImage, downloadVideoWithMeta } from '../libs/media.js';
 import { askAI } from '../libs/ai.js';
 import { searchApk } from '../libs/scrapers.js';
@@ -583,6 +585,541 @@ export async function handleWatchHentai(sock, m, { jid, q, cmd }) {
     await sock.sendMessage(jid, { text: `[WATCHHENTAI ERROR] ${err.message}` }, { quoted: m });
   }
 }
+
+// ─── Lustpress (R18 Video Search: Eporner, XNXX, PornHub) ───────────────────
+export async function handleLustpress(sock, m, { jid, q, cmd, args }) {
+  if (!q) {
+    return sock.sendMessage(jid, {
+      text: `🔞 *[ LUSTPRESS 18+ UNIFIED AGGREGATOR ]*\n\n` +
+        `Pencarian multi-provider video 18+ dalam satu endpoint:\n\n` +
+        `• *Format:* ${config.prefix}${cmd} [provider] <kata kunci>\n\n` +
+        `*Daftar Provider:* \n` +
+        `1. *eporner* (default, HD + thumbnail)\n` +
+        `   Contoh: ${config.prefix}${cmd} cosplay\n` +
+        `   Atau: ${config.prefix}${cmd} eporner cosplay\n\n` +
+        `2. *xnxx* (database xnxx)\n` +
+        `   Contoh: ${config.prefix}${cmd} xnxx makima\n\n` +
+        `3. *pornhub* / *ph* (database pornhub)\n` +
+        `   Contoh: ${config.prefix}${cmd} ph anime\n\n` +
+        `_Bisa juga langsung menggunakan perintah: .xnxx <query> atau .pornhub <query>_`
+    }, { quoted: m });
+  }
+
+  const warnHeader = `🔞 *[WARNING 18+ RESTRICTED CONTENT]*\n_Lustpress R18 Video Aggregator_\n────────────────────\n`;
+
+  // Deteksi provider dari prefix command atau argument pertama
+  let provider = 'eporner';
+  let query = q.trim();
+
+  const firstWord = (args?.[0] || '').toLowerCase();
+  if (['xnxx', 'ph', 'pornhub', 'eporner'].includes(firstWord)) {
+    provider = (firstWord === 'ph') ? 'pornhub' : firstWord;
+    query = args.slice(1).join(' ').trim();
+  } else if (cmd === 'xnxx') {
+    provider = 'xnxx';
+  } else if (cmd === 'pornhub' || cmd === 'ph') {
+    provider = 'pornhub';
+  } else if (cmd === 'eporner') {
+    provider = 'eporner';
+  }
+
+  if (!query) {
+    return sock.sendMessage(jid, { text: `⚠️ Masukkan kata kunci pencarian untuk provider *${provider}*.` }, { quoted: m });
+  }
+
+  await sock.sendMessage(jid, { text: `${warnHeader}🔍 [${provider.toUpperCase()}] Mencari video untuk: "${query}"...` }, { quoted: m });
+
+  // 1. PROVIDER: XNXX
+  if (provider === 'xnxx') {
+    try {
+      const searchUrl = `https://r.jina.ai/https://www.xnxx.com/search/${encodeURIComponent(query)}`;
+      const res = await fetch(searchUrl, { signal: AbortSignal.timeout(15000) });
+      if (!res.ok) throw new Error('Gagal mengambil data dari XNXX');
+
+      const text = await res.text();
+      const videoRegex = /\[!\[Image \d+\]\(([^\)]+)\)\]\((https:\/\/www\.xnxx\.com\/video-[^\)]+)\)\s*\[([^\]]+)\]/gi;
+      let match;
+      const items = [];
+      while ((match = videoRegex.exec(text)) !== null && items.length < 5) {
+        items.push({
+          thumb: match[1],
+          url: match[2],
+          title: match[3].trim()
+        });
+      }
+
+      if (!items.length) {
+        // Fallback matching
+        const simpleRegex = /\[([^\]]+)\]\((https:\/\/www\.xnxx\.com\/video-[^\)]+)\)/gi;
+        while ((match = simpleRegex.exec(text)) !== null && items.length < 5) {
+          if (!items.some(i => i.url === match[2])) {
+            items.push({ thumb: null, url: match[2], title: match[1].trim() });
+          }
+        }
+      }
+
+      if (!items.length) {
+        return sock.sendMessage(jid, { text: `${warnHeader}❌ Tidak ditemukan video di XNXX untuk "${query}".` }, { quoted: m });
+      }
+
+      let caption = `${warnHeader}🎬 *Hasil Pencarian XNXX: ${query}*\n\n`;
+      items.forEach((it, idx) => {
+        caption += `*${idx + 1}. ${it.title}*\n  🔗 ${it.url}\n\n`;
+      });
+
+      if (items[0]?.thumb) {
+        try {
+          const tRes = await fetch(items[0].thumb, { signal: AbortSignal.timeout(8000) });
+          if (tRes.ok) {
+            const buf = Buffer.from(await tRes.arrayBuffer());
+            return await sock.sendMessage(jid, { image: buf, caption }, { quoted: m });
+          }
+        } catch {}
+      }
+
+      return await sock.sendMessage(jid, { text: caption }, { quoted: m });
+    } catch (err) {
+      return await sock.sendMessage(jid, { text: `${warnHeader}[ERROR XNXX] ${err.message}` }, { quoted: m });
+    }
+  }
+
+  // 2. PROVIDER: PORNHUB
+  if (provider === 'pornhub') {
+    try {
+      const searchUrl = `https://r.jina.ai/https://www.pornhub.com/video/search?search=${encodeURIComponent(query)}`;
+      const res = await fetch(searchUrl, { signal: AbortSignal.timeout(15000) });
+      if (!res.ok) throw new Error('Gagal mengambil data dari PornHub');
+
+      const text = await res.text();
+      const phRegex = /\[([^\]]+)\]\((https:\/\/www\.pornhub\.com\/view_video\.php\?viewkey=[a-zA-Z0-9]+)\)/gi;
+      let match;
+      const items = [];
+      while ((match = phRegex.exec(text)) !== null && items.length < 5) {
+        if (!items.some(i => i.url === match[2])) {
+          items.push({ url: match[2], title: match[1].trim() });
+        }
+      }
+
+      if (!items.length) {
+        return sock.sendMessage(jid, { text: `${warnHeader}❌ Tidak ditemukan video di PornHub untuk "${query}".` }, { quoted: m });
+      }
+
+      let caption = `${warnHeader}🎬 *Hasil Pencarian PornHub: ${query}*\n\n`;
+      items.forEach((it, idx) => {
+        caption += `*${idx + 1}. ${it.title}*\n  🔗 ${it.url}\n\n`;
+      });
+
+      return await sock.sendMessage(jid, { text: caption }, { quoted: m });
+    } catch (err) {
+      return await sock.sendMessage(jid, { text: `${warnHeader}[ERROR PORNHUB] ${err.message}` }, { quoted: m });
+    }
+  }
+
+  // 3. PROVIDER DEFAULT: EPORNER
+  try {
+    const res = await fetch(`https://www.eporner.com/api/v2/video/search/?query=${encodeURIComponent(query)}&per_page=5`, {
+      headers: { 'User-Agent': 'Mozilla/5.0' },
+      signal: AbortSignal.timeout(10000)
+    });
+
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const data = await res.json();
+    const videos = data?.videos || [];
+
+    if (!videos.length) {
+      return sock.sendMessage(jid, { text: `${warnHeader}❌ Tidak ada video ditemukan di Eporner untuk "${query}".` }, { quoted: m });
+    }
+
+    const first = videos[0];
+    let text = `${warnHeader}🎬 *Hasil Pencarian Eporner: ${query}*\n\n`;
+    text += `*1. ${first.title}*\n`;
+    text += `  ⏱️ *Durasi:* ${first.length_min || '-'}\n`;
+    text += `  👁️ *Views:* ${first.views?.toLocaleString('id-ID') || '-'}\n`;
+    text += `  ⭐ *Rating:* ${first.rate || '0'}\n`;
+    text += `  🔗 *URL:* ${first.url}\n\n`;
+
+    if (videos.length > 1) {
+      text += `📑 *Video Lainnya:*\n`;
+      videos.slice(1).forEach((v, idx) => {
+        text += `\n*${idx + 2}. ${v.title}*\n  ⏱️ ${v.length_min || '-'} | 👁️ ${v.views?.toLocaleString('id-ID') || '-'}\n  🔗 ${v.url}\n`;
+      });
+    }
+
+    const thumbUrl = first.default_thumb?.src || first.thumbs?.[0]?.src;
+    if (thumbUrl) {
+      try {
+        const thumbRes = await fetch(thumbUrl, { headers: { 'User-Agent': 'Mozilla/5.0' }, signal: AbortSignal.timeout(8000) });
+        if (thumbRes.ok) {
+          const imgBuf = Buffer.from(await thumbRes.arrayBuffer());
+          return await sock.sendMessage(jid, { image: imgBuf, caption: text }, { quoted: m });
+        }
+      } catch {}
+    }
+
+    await sock.sendMessage(jid, { text }, { quoted: m });
+  } catch (err) {
+    await sock.sendMessage(jid, { text: `${warnHeader}[ERROR EPORNER] ${err.message}` }, { quoted: m });
+  }
+}
+
+// Helper generator PDF nHentai
+async function generateNhentaiPdf(code) {
+  const res = await fetch(`https://r.jina.ai/https://nhentai.net/g/${code}/1/`, {
+    signal: AbortSignal.timeout(15000)
+  });
+  if (!res.ok) throw new Error(`Gagal membuka halaman pembaca nhentai #${code}`);
+
+  const text = await res.text();
+  const titleMatch = text.match(/^Title:\s*(.+?)(?:\s*-\s*Page\s*\d+)?$/m);
+  const title = titleMatch ? titleMatch[1].trim() : `nhentai_${code}`;
+
+  const pagesMatch = text.match(/1\s+of\s+(\d+)/i);
+  const totalPages = pagesMatch ? parseInt(pagesMatch[1], 10) : 0;
+
+  const imgMatch = text.match(/https:\/\/[ti]\d*\.nhentai\.net\/galleries\/(\d+)\/1\.([a-zA-Z0-9]+)/);
+  if (!imgMatch || !totalPages) {
+    throw new Error(`Informasi galeri nhentai #${code} tidak dapat dideteksi`);
+  }
+
+  const mediaId = imgMatch[1];
+  const defaultExt = imgMatch[2];
+
+  const pages = new Array(totalPages).fill(null);
+  const BATCH_SIZE = 5;
+
+  async function downloadPage(pageNum) {
+    const exts = [defaultExt, 'webp', 'jpg', 'png'].filter((v, i, a) => a.indexOf(v) === i);
+    for (const ext of exts) {
+      try {
+        const url = `https://i.nhentai.net/galleries/${mediaId}/${pageNum}.${ext}`;
+        const pRes = await fetch(url, {
+          headers: { 'User-Agent': 'Mozilla/5.0' },
+          signal: AbortSignal.timeout(10000)
+        });
+        if (pRes.ok) {
+          const rawBuf = Buffer.from(await pRes.arrayBuffer());
+          const jpegBuf = await sharp(rawBuf).jpeg({ quality: 85 }).toBuffer();
+          const meta = await sharp(jpegBuf).metadata();
+          return { pageNum, buf: jpegBuf, width: meta.width, height: meta.height };
+        }
+      } catch (e) {}
+    }
+    return null;
+  }
+
+  for (let i = 1; i <= totalPages; i += BATCH_SIZE) {
+    const batch = [];
+    for (let j = i; j < i + BATCH_SIZE && j <= totalPages; j++) {
+      batch.push(downloadPage(j));
+    }
+    const results = await Promise.all(batch);
+    for (const r of results) {
+      if (r) pages[r.pageNum - 1] = r;
+    }
+  }
+
+  const doc = new PDFDocument({ autoFirstPage: false });
+  const chunks = [];
+  doc.on('data', c => chunks.push(c));
+
+  const pdfPromise = new Promise((resolve, reject) => {
+    doc.on('end', () => resolve(Buffer.concat(chunks)));
+    doc.on('error', reject);
+  });
+
+  for (const page of pages) {
+    if (!page) continue;
+    doc.addPage({ size: [page.width, page.height], margin: 0 });
+    doc.image(page.buf, 0, 0, { width: page.width, height: page.height });
+  }
+
+  doc.end();
+  const pdfBuf = await pdfPromise;
+  return { title, totalPages, pdfBuf };
+}
+
+// ─── Tomoe (R18 Doujinshi / Manga: NHentai, Pururin, HentaiFox) ─────────────
+export async function handleTomoe(sock, m, { jid, q, cmd, args }) {
+  if (!q && !cmd.includes('pdf')) {
+    return sock.sendMessage(jid, {
+      text: `🔞 *[ TOMOE 18+ DOUJINSHI AGGREGATOR ]*\n\n` +
+        `Pencarian & detail doujinshi multi-provider dalam satu endpoint:\n\n` +
+        `• *Format:* ${config.prefix}${cmd} [provider] <kata kunci / kode>\n\n` +
+        `*Daftar Provider:* \n` +
+        `1. *nhentai* / *nh* (default)\n` +
+        `   Cari : ${config.prefix}${cmd} genshin\n` +
+        `   Kode : ${config.prefix}${cmd} nh 681176\n\n` +
+        `2. *pururin*\n` +
+        `   Cari : ${config.prefix}${cmd} pururin genshin\n` +
+        `   Kode : ${config.prefix}${cmd} pururin 67870\n\n` +
+        `3. *hentaifox* / *hfox*\n` +
+        `   Cari : ${config.prefix}${cmd} hentaifox genshin\n` +
+        `   Kode : ${config.prefix}${cmd} hfox 172872\n\n` +
+        `4. *Download PDF:* \n` +
+        `   Unduh full PDF: ${config.prefix}nhpdf 681176\n\n` +
+        `_Direct shortcuts: .nhentai, .nh, .nhpdf, .pururin, .hentaifox, .hfox_`
+    }, { quoted: m });
+  }
+
+  const warnHeader = `🔞 *[WARNING 18+ RESTRICTED CONTENT]*\n_Tomoe Doujinshi Aggregator_\n────────────────────\n`;
+
+  // Deteksi mode PDF
+  const isPdf = cmd.includes('pdf') || args?.includes('--pdf') || (args?.[0] || '').toLowerCase() === 'pdf';
+  if (isPdf) {
+    const rawTarget = q ? q.replace(/--pdf/g, '').replace(/\bpdf\b/gi, '').trim() : '';
+    const codeMatch = rawTarget.match(/\b\d{4,7}\b/);
+    if (!codeMatch) {
+      return sock.sendMessage(jid, {
+        text: `⚠️ Masukkan kode nHentai yang valid untuk diunduh sebagai PDF.\n\nContoh: *${config.prefix}nhpdf 681176*`
+      }, { quoted: m });
+    }
+
+    const code = codeMatch[0];
+    await sock.sendMessage(jid, {
+      text: `${warnHeader}⏳ *[NHENTAI PDF COMPILER]*\nSedang menyiapkan unduhan doujin #${code}...\n_Mohon tunggu, bot sedang mengunduh halaman & menyusun file PDF._`
+    }, { quoted: m });
+
+    try {
+      const { title, totalPages, pdfBuf } = await generateNhentaiPdf(code);
+      const cleanTitle = title.replace(/[\\/:*?"<>|]/g, '_').slice(0, 70);
+      const sizeMb = (pdfBuf.length / (1024 * 1024)).toFixed(2);
+
+      return await sock.sendMessage(jid, {
+        document: pdfBuf,
+        mimetype: 'application/pdf',
+        fileName: `${cleanTitle}.pdf`,
+        caption: `${warnHeader}📖 *[NHENTAI PDF COMPLETED]*\n\n` +
+          `📌 *Judul:* ${title}\n` +
+          `🔢 *Code:* #${code}\n` +
+          `📄 *Total:* ${totalPages} Halaman\n` +
+          `📦 *Ukuran:* ${sizeMb} MB\n\n` +
+          `_Dokumen siap dibaca!_`
+      }, { quoted: m });
+    } catch (err) {
+      return await sock.sendMessage(jid, {
+        text: `${warnHeader}❌ Gagal membuat PDF untuk #${code}: ${err.message}`
+      }, { quoted: m });
+    }
+  }
+
+  // Deteksi provider dari prefix command atau argument pertama
+  let provider = 'nhentai';
+  let query = q.trim();
+
+  const firstWord = (args?.[0] || '').toLowerCase();
+  if (['nh', 'nhentai', 'pururin', 'hentaifox', 'hfox'].includes(firstWord)) {
+    if (firstWord === 'nh') provider = 'nhentai';
+    else if (firstWord === 'hfox') provider = 'hentaifox';
+    else provider = firstWord;
+    query = args.slice(1).join(' ').trim();
+  } else if (cmd === 'nhentai' || cmd === 'nh') {
+    provider = 'nhentai';
+  } else if (cmd === 'pururin') {
+    provider = 'pururin';
+  } else if (cmd === 'hentaifox' || cmd === 'hfox') {
+    provider = 'hentaifox';
+  }
+
+  if (!query) {
+    return sock.sendMessage(jid, { text: `⚠️ Masukkan kata kunci atau kode doujin untuk provider *${provider}*.` }, { quoted: m });
+  }
+
+  await sock.sendMessage(jid, { text: `${warnHeader}🔍 [${provider.toUpperCase()}] Memproses: "${query}"...` }, { quoted: m });
+
+  const cleanLinks = (str) => str ? str.replace(/\[([^\]]+)\]\([^\)]+\)/g, '$1, ').replace(/,\s*$/, '') : '-';
+
+  const sendResult = async (caption, thumbUrl) => {
+    if (thumbUrl) {
+      try {
+        const tRes = await fetch(thumbUrl, {
+          headers: { 'User-Agent': 'Mozilla/5.0' },
+          signal: AbortSignal.timeout(8000)
+        });
+        if (tRes.ok) {
+          const buf = Buffer.from(await tRes.arrayBuffer());
+          return await sock.sendMessage(jid, { image: buf, caption }, { quoted: m });
+        }
+      } catch {}
+    }
+    return await sock.sendMessage(jid, { text: caption }, { quoted: m });
+  };
+
+  // 1. PROVIDER: NHENTAI
+  if (provider === 'nhentai') {
+    try {
+      const codeMatch = query.match(/\b\d{5,7}\b/);
+      const isCode = /^\d+$/.test(query) || (codeMatch && query.includes('nhentai.net/g/'));
+
+      if (isCode) {
+        const code = codeMatch ? codeMatch[0] : query;
+        const res = await fetch(`https://r.jina.ai/https://nhentai.net/g/${code}/`, { signal: AbortSignal.timeout(15000) });
+        if (!res.ok) throw new Error(`Gagal memuat galeri nhentai #${code}`);
+
+        const text = await res.text();
+        const fullTitle = text.match(/#\s+(\[[^\]]+\][^\n]+)/)?.[1] || text.match(/^Title:\s*([^\n]+)/m)?.[1] || `#${code}`;
+        const cover = text.match(/\[!\[Image \d+:[^\]]*\]\((https:\/\/t\d*\.nhentai\.net\/galleries\/\d+\/[^\)]+)\)\]/)?.[1];
+        const parodies = cleanLinks(text.match(/Parodies:\s*([^\n]+)/)?.[1]);
+        const characters = cleanLinks(text.match(/Characters:\s*([^\n]+)/)?.[1]);
+        const tags = cleanLinks(text.match(/Tags:\s*([^\n]+)/)?.[1]);
+        const artists = cleanLinks(text.match(/Artists:\s*([^\n]+)/)?.[1]);
+        const languages = cleanLinks(text.match(/Languages:\s*([^\n]+)/)?.[1]);
+        const pages = text.match(/Pages:\s*\[?(\d+)\]?/)?.[1] || '-';
+
+        let caption = `${warnHeader}📖 *[NHENTAI] ${fullTitle}*\n\n`;
+        caption += `🔢 *Code:* #${code}\n`;
+        caption += `🎨 *Artist:* ${artists}\n`;
+        caption += `🏷️ *Parody:* ${parodies}\n`;
+        caption += `👤 *Character:* ${characters}\n`;
+        caption += `🌐 *Language:* ${languages}\n`;
+        caption += `📄 *Pages:* ${pages}\n`;
+        caption += `🔖 *Tags:* ${tags}\n\n`;
+        caption += `🔗 *Read:* https://nhentai.net/g/${code}/\n\n`;
+        caption += `📥 _Download PDF lengkap: ${config.prefix}nhpdf ${code}_`;
+
+        return await sendResult(caption, cover);
+      }
+
+      const res = await fetch(`https://r.jina.ai/https://nhentai.net/search/?q=${encodeURIComponent(query)}`, { signal: AbortSignal.timeout(15000) });
+      if (!res.ok) throw new Error('Gagal mencari di nHentai');
+
+      const text = await res.text();
+      const items = [];
+      const lines = text.split('\n');
+      for (const line of lines) {
+        const m = line.match(/\((https:\/\/t\d+\.nhentai\.net\/galleries\/\d+\/[^\)]+)\)\s*(.+?)\]\((https:\/\/nhentai\.net\/g\/(\d+)\/)\)/);
+        if (m && !items.some(x => x.code === m[4])) {
+          items.push({ thumb: m[1], title: m[2].trim(), url: m[3], code: m[4] });
+          if (items.length >= 5) break;
+        }
+      }
+
+      if (!items.length) {
+        return sock.sendMessage(jid, { text: `${warnHeader}❌ Tidak ditemukan doujin di nHentai untuk "${query}".` }, { quoted: m });
+      }
+
+      let caption = `${warnHeader}📚 *Hasil Pencarian nHentai: ${query}*\n\n`;
+      items.forEach((it, idx) => {
+        caption += `*${idx + 1}. ${it.title}*\n  🔢 Code: #${it.code}\n  🔗 ${it.url}\n\n`;
+      });
+      caption += `💡 _Ketik: ${config.prefix}nh <kode> untuk melihat detail lengkap._`;
+
+      return await sendResult(caption, items[0]?.thumb);
+    } catch (err) {
+      return await sock.sendMessage(jid, { text: `${warnHeader}[ERROR NHENTAI] ${err.message}` }, { quoted: m });
+    }
+  }
+
+  // 2. PROVIDER: PURURIN
+  if (provider === 'pururin') {
+    try {
+      const codeMatch = query.match(/\b\d{4,6}\b/);
+      const isCode = /^\d+$/.test(query) || (codeMatch && query.includes('pururin.me/gallery/'));
+
+      if (isCode) {
+        const code = codeMatch ? codeMatch[0] : query;
+        const res = await fetch(`https://r.jina.ai/https://pururin.me/gallery/${code}`, { signal: AbortSignal.timeout(15000) });
+        if (!res.ok) throw new Error(`Gagal memuat galeri Pururin #${code}`);
+
+        const text = await res.text();
+        const title = text.match(/^Title:\s*([^\n]+)/m)?.[1] || `#${code}`;
+        const cover = text.match(/\((https:\/\/i\.pururin\.me\/[^\)]+)\)/)?.[1];
+
+        let caption = `${warnHeader}📖 *[PURURIN] ${title}*\n\n`;
+        caption += `🔢 *Code:* #${code}\n`;
+        caption += `🔗 *Read:* https://pururin.me/gallery/${code}\n`;
+
+        return await sendResult(caption, cover);
+      }
+
+      const res = await fetch(`https://r.jina.ai/https://pururin.me/search?q=${encodeURIComponent(query)}`, { signal: AbortSignal.timeout(15000) });
+      if (!res.ok) throw new Error('Gagal mencari di Pururin');
+
+      const text = await res.text();
+      const items = [];
+      const pururinRegex = /\((https:\/\/i\.pururin\.me\/[^\)]+)\)\s*##\s*([^\]]+)\]\((https:\/\/pururin\.me\/gallery\/(\d+)[^\s"\)]*)/g;
+      let match;
+      while ((match = pururinRegex.exec(text)) !== null && items.length < 5) {
+        if (!items.some(x => x.code === match[4])) {
+          items.push({ thumb: match[1], title: match[2].trim(), url: match[3], code: match[4] });
+        }
+      }
+
+      if (!items.length) {
+        return sock.sendMessage(jid, { text: `${warnHeader}❌ Tidak ditemukan doujin di Pururin untuk "${query}".` }, { quoted: m });
+      }
+
+      let caption = `${warnHeader}📚 *Hasil Pencarian Pururin: ${query}*\n\n`;
+      items.forEach((it, idx) => {
+        caption += `*${idx + 1}. ${it.title}*\n  🔢 Code: #${it.code}\n  🔗 ${it.url}\n\n`;
+      });
+      caption += `💡 _Ketik: ${config.prefix}pururin <kode> untuk melihat galeri._`;
+
+      return await sendResult(caption, items[0]?.thumb);
+    } catch (err) {
+      return await sock.sendMessage(jid, { text: `${warnHeader}[ERROR PURURIN] ${err.message}` }, { quoted: m });
+    }
+  }
+
+  // 3. PROVIDER: HENTAIFOX
+  if (provider === 'hentaifox') {
+    try {
+      const codeMatch = query.match(/\b\d{4,7}\b/);
+      const isCode = /^\d+$/.test(query) || (codeMatch && query.includes('hentaifox.com/gallery/'));
+
+      if (isCode) {
+        const code = codeMatch ? codeMatch[0] : query;
+        const res = await fetch(`https://r.jina.ai/https://hentaifox.com/gallery/${code}/`, { signal: AbortSignal.timeout(15000) });
+        if (!res.ok) throw new Error(`Gagal memuat galeri HentaiFox #${code}`);
+
+        const text = await res.text();
+        const title = text.match(/#\s+([^\n]+)/)?.[1] || text.match(/^Title:\s*([^\n]+)/m)?.[1] || `#${code}`;
+        const cover = text.match(/\((https:\/\/i\d*\.hentaifox\.com\/[^\)]+)\)/)?.[1];
+        const parodies = cleanLinks(text.match(/Parodies:\s*([^\n]+)/)?.[1]);
+        const artists = cleanLinks(text.match(/Artists:\s*([^\n]+)/)?.[1]);
+        const tags = cleanLinks(text.match(/Tags:\s*([^\n]+)/)?.[1]);
+        const pages = text.match(/Pages:\s*\[?(\d+)\]?/)?.[1] || '-';
+
+        let caption = `${warnHeader}📖 *[HENTAIFOX] ${title}*\n\n`;
+        caption += `🔢 *Code:* #${code}\n`;
+        caption += `🎨 *Artist:* ${artists}\n`;
+        caption += `🏷️ *Parody:* ${parodies}\n`;
+        caption += `📄 *Pages:* ${pages}\n`;
+        caption += `🔖 *Tags:* ${tags}\n\n`;
+        caption += `🔗 *Read:* https://hentaifox.com/gallery/${code}/`;
+
+        return await sendResult(caption, cover);
+      }
+
+      const res = await fetch(`https://r.jina.ai/https://hentaifox.com/search/?q=${encodeURIComponent(query)}`, { signal: AbortSignal.timeout(15000) });
+      if (!res.ok) throw new Error('Gagal mencari di HentaiFox');
+
+      const text = await res.text();
+      const items = [];
+      const hfoxRegex = /\[!\[Image \d+\]\((https:\/\/i\d*\.hentaifox\.com\/[^\)]+)\)\]\((https:\/\/hentaifox\.com\/gallery\/(\d+)\/)\)[\s\S]*?##\s*\[([^\]]+)\]/g;
+      let match;
+      while ((match = hfoxRegex.exec(text)) !== null && items.length < 5) {
+        if (!items.some(x => x.code === match[3])) {
+          items.push({ thumb: match[1], url: match[2], code: match[3], title: match[4].trim() });
+        }
+      }
+
+      if (!items.length) {
+        return sock.sendMessage(jid, { text: `${warnHeader}❌ Tidak ditemukan doujin di HentaiFox untuk "${query}".` }, { quoted: m });
+      }
+
+      let caption = `${warnHeader}📚 *Hasil Pencarian HentaiFox: ${query}*\n\n`;
+      items.forEach((it, idx) => {
+        caption += `*${idx + 1}. ${it.title}*\n  🔢 Code: #${it.code}\n  🔗 ${it.url}\n\n`;
+      });
+      caption += `💡 _Ketik: ${config.prefix}hfox <kode> untuk melihat detail._`;
+
+      return await sendResult(caption, items[0]?.thumb);
+    } catch (err) {
+      return await sock.sendMessage(jid, { text: `${warnHeader}[ERROR HENTAIFOX] ${err.message}` }, { quoted: m });
+    }
+  }
+}
+
 
 
 

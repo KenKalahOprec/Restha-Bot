@@ -266,6 +266,12 @@ export async function handleMenu(sock, m, { jid, cmd, args, userName }) {
 │ • ${p}nsfwanal
 │ • ${p}javsearch | ${p}jav <ID/Query>
 │ • ${p}watchhentai | ${p}whentai <query>
+│ • ${p}lustpress | ${p}lp | ${p}r18 [provider] <query>
+│ • ${p}xnxx | ${p}pornhub | ${p}eporner <query>
+│ • ${p}tomoe | ${p}doujin [provider] <query/code>
+│ • ${p}nhentai | ${p}nh <code/query>
+│ • ${p}nhpdf | ${p}tomoepdf <kode>
+│ • ${p}pururin | ${p}hentaifox <code/query>
 └──`,
 
     owner: `┌── [ 15. OWNER & SYSTEM MANAGEMENT ]

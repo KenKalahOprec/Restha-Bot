@@ -197,10 +197,11 @@ export async function handleMenfess(sock, m, { jid, q, senderNumber, isGroup, cm
   }
 
   const targetJid = `${rawTarget}@s.whatsapp.net`;
-  const senderJid = `${senderNumber}@s.whatsapp.net`;
+  const cleanSender = String(senderNumber || jid.split('@')[0].split(':')[0]).replace(/\D/g, '');
+  const senderJid = cleanSender ? `${cleanSender}@s.whatsapp.net` : jid;
   const pesan = parts.slice(1).join(' | ');
 
-  if (targetJid === senderJid) {
+  if (targetJid === senderJid || targetJid === jid) {
     return sock.sendMessage(jid, { text: '❌ Kamu tidak bisa mengirim menfess ke nomor sendiri!' }, { quoted: m });
   }
 
@@ -231,6 +232,9 @@ export async function handleMenfess(sock, m, { jid, q, senderNumber, isGroup, cm
     };
     menfessSessions.set(targetJid, sessionData);
     menfessSessions.set(senderJid, sessionData);
+    menfessSessions.set(jid, sessionData);
+    if (cleanSender) menfessSessions.set(cleanSender, sessionData);
+    menfessSessions.set(rawTarget, sessionData);
 
     await sock.sendMessage(jid, {
       text: `✅ *Menfess Berhasil Terkirim!*\n\nPesan anonimmu telah diteruskan ke target (+${rawTarget}).\nJika target membalas, pesannya akan otomatis masuk ke sini.`

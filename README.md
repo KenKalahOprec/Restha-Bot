@@ -430,14 +430,24 @@ Ikuti langkah-langkah berikut untuk memasang dan menjalankan bot pada environmen
 | `.ttvgirl`, `.ttvukhty`, `.ttvsantuy`| TikTok Vids | Video singkat pilihan dari tren platform TikTok |
 
 ### 14. Restricted Gallery (18+)
-| Perintah | Shortcut | Keterangan Konten |
-|---|---|---|
-| `.nsfwmilf`, `.nsfwyuri` | - | Koleksi foto ilustrasi anime dewasa NSFW kategori spesifik |
-| `.nsfwfoot`, `.nsfwblowjob` | - | Koleksi gambar anime dewasa pose tertentu |
-| `.nsfwpussy`, `.nsfwass` | - | Ilustrasi eksplisit berformat gambar kualitas tinggi |
-| `.hentai`, `.paizuri` | - | Gambar karya seni anime dewasa acak dari Nekobot |
-| `.javsearch` | `.jav` | Pencarian basis data judul, artis, & kode seri JAV |
-| `.watchhentai`| `.whentai` | Pencarian anime dewasa di WatchHentai beserta cover poster |
+| Perintah | Shortcut | Parameter | Deskripsi |
+|---|---|---|---|
+| `.nsfwmilf`, `.nsfwyuri` | - | - | Koleksi foto ilustrasi anime dewasa NSFW kategori spesifik |
+| `.nsfwfoot`, `.nsfwblowjob` | - | - | Koleksi gambar anime dewasa pose tertentu |
+| `.nsfwpussy`, `.nsfwass` | - | - | Ilustrasi eksplisit berformat gambar kualitas tinggi |
+| `.hentai`, `.paizuri` | - | - | Gambar karya seni anime dewasa acak dari Nekobot |
+| `.javsearch` | `.jav` | `<ID/Query>` | Pencarian basis data judul, artis, & kode seri JAV |
+| `.watchhentai`| `.whentai` | `<query>` | Pencarian anime dewasa di WatchHentai beserta cover poster |
+| `.lustpress` | `.lp`, `.r18` | `[provider] <query>` | Unified R18 video aggregator (Eporner, XNXX, PornHub) |
+| `.xnxx` | - | `<query>` | Shortcut pencarian video dewasa di database XNXX |
+| `.pornhub` | `.ph` | `<query>` | Shortcut pencarian video dewasa di database PornHub |
+| `.eporner` | - | `<query>` | Shortcut pencarian video dewasa di database Eporner |
+| `.tomoe` | `.doujin` | `[provider] <query/code>` | Unified doujinshi aggregator (nHentai, Pururin, HentaiFox) |
+| `.nhentai` | `.nh` | `<kode / query>` | Detail & cover doujin nHentai atau pencarian 5 judul teratas |
+| `.nhpdf` | `.tomoepdf` | `<kode>` | Mengunduh seluruh halaman doujin dan mengompilasinya jadi PDF |
+| `.pururin` | - | `<kode / query>` | Pencarian dan detail doujinshi dari database Pururin |
+| `.hentaifox` | `.hfox` | `<kode / query>` | Pencarian dan detail doujinshi dari database HentaiFox |
+
 
 ### 15. Owner & System Management
 | Perintah | Shortcut | Parameter | Deskripsi |
