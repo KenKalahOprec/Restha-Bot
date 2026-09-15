@@ -11,12 +11,10 @@ import ffmpeg from 'fluent-ffmpeg';
 import ffmpegInstaller from '@ffmpeg-installer/ffmpeg';
 import fs from 'fs';
 import path from 'path';
-import http from 'http';
 import config from './config.js';
 import initialHandler from './src/handlers/message.js';
 import handleGroupParticipantsUpdate from './src/handlers/group.js';
 import { logBanner, logConnection, c } from './src/libs/logger.js';
-import { useMongoAuthState } from './src/libs/mongoAuthState.js';
 
 ffmpeg.setFfmpegPath(ffmpegInstaller.path);
 
@@ -114,23 +112,7 @@ async function startBot() {
     } catch {}
   }
 
-  let state, saveCreds, clearAuth;
-  if (config.mongoUri) {
-    logConnection('info', 'Menggunakan MongoDB Cloud Session Storage');
-    const mongoAuth = await useMongoAuthState(config.mongoUri, 'baileys_session');
-    state = mongoAuth.state;
-    saveCreds = mongoAuth.saveCreds;
-    clearAuth = mongoAuth.clearAuth;
-  } else {
-    logConnection('info', 'Menggunakan Local File Session Storage (./session)');
-    const fileAuth = await useMultiFileAuthState('./session');
-    state = fileAuth.state;
-    saveCreds = fileAuth.saveCreds;
-    clearAuth = async () => {
-      fs.rmSync(path.resolve('./session'), { recursive: true, force: true });
-      fs.mkdirSync(path.resolve('./session'), { recursive: true });
-    };
-  }
+  const { state, saveCreds } = await useMultiFileAuthState('./session');
 
   // If me.id exists but registered is false (can happen after unclean shutdown),
   // mark as registered so Baileys reuses the session instead of showing a new QR.
@@ -210,7 +192,8 @@ async function startBot() {
       if (statusCode === DisconnectReason.loggedOut) {
         logConnection('info', 'Sesi tidak valid / logout. Menghapus sesi & restart...');
         try {
-          if (clearAuth) await clearAuth();
+          fs.rmSync(path.resolve('./session'), { recursive: true, force: true });
+          fs.mkdirSync(path.resolve('./session'), { recursive: true });
         } catch {}
         pairingRequested = false;
         setTimeout(startBot, 2000);
@@ -262,20 +245,5 @@ async function startBot() {
     await handleGroupParticipantsUpdate(sock, update);
   });
 }
-
-// HTTP Health Check Server untuk Render / Cloud Host (mencegah deployment timeout & port binding error)
-const server = http.createServer((req, res) => {
-  res.writeHead(200, { 'Content-Type': 'application/json' });
-  res.end(JSON.stringify({
-    status: 'online',
-    bot: 'WhatsApp Selfbot',
-    uptime: process.uptime(),
-    storage: config.mongoUri ? 'MongoDB' : 'Local File'
-  }));
-});
-
-server.listen(config.port, () => {
-  logConnection('info', `HTTP Server berjalan di port ${config.port} (Render Ready)`);
-});
 
 startBot();
