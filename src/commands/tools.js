@@ -455,3 +455,195 @@ export async function handleTextEffect(sock, m, { jid, cmd, q, quoted }) {
   }
 }
 
+export async function handleDraw(sock, m, { jid, q, cmd }) {
+  if (!q) {
+    return sock.sendMessage(jid, {
+      text: `🎨 *[ GPT-IMAGE 2.5 ENGINE ]*\n\n` +
+        `*Format:* *${config.prefix}${cmd} <deskripsi visual> [opsi]*\n\n` +
+        `*Contoh:* \n` +
+        `• ${config.prefix}${cmd} samurai di tengah kota neo tokyo saat hujan\n` +
+        `• ${config.prefix}${cmd} kastil fantasi di atas awan --anime\n` +
+        `• ${config.prefix}${cmd} poster mobil balap masa depan --portrait\n\n` +
+        `*Preset Model (GPT-Image 2.5 Skill):*\n` +
+        `• \`--flare\`    : Generasi cepat, warna dinamis & tajam\n` +
+        `• \`--sunburst\` : Ketelitian tinggi, raytracing & tekstur realistis (default)\n` +
+        `• \`--anime\`    : Estetika anime ala Makoto Shinkai\n` +
+        `• \`--cyber\`    : Gaya neon cyberpunk & pantulan basah\n` +
+        `• \`--3d\`       : Render 3D Octane / Unreal Engine 5\n` +
+        `• \`--portrait\` : Rasio vertikal (768x1024)\n` +
+        `• \`--landscape\`: Rasio horizontal (1024x768)`
+    }, { quoted: m });
+  }
+
+  let rawPrompt = q;
+  let modelStyle = 'sunburst';
+  let width = 1024;
+  let height = 1024;
+  let modelName = 'GPT Image 2.5 Sunburst';
+
+  if (rawPrompt.includes('--flare')) {
+    modelStyle = 'flare';
+    modelName = 'GPT Image 2.5 Flare';
+    rawPrompt = rawPrompt.replace(/--flare/gi, '').trim();
+  } else if (rawPrompt.includes('--anime')) {
+    modelStyle = 'anime';
+    modelName = 'GPT Image Anime Studio';
+    rawPrompt = rawPrompt.replace(/--anime/gi, '').trim();
+  } else if (rawPrompt.includes('--cyber')) {
+    modelStyle = 'cyber';
+    modelName = 'GPT Image Cyberpunk';
+    rawPrompt = rawPrompt.replace(/--cyber/gi, '').trim();
+  } else if (rawPrompt.includes('--3d')) {
+    modelStyle = '3d';
+    modelName = 'GPT Image 3D Octane';
+    rawPrompt = rawPrompt.replace(/--3d/gi, '').trim();
+  } else if (rawPrompt.includes('--sunburst')) {
+    rawPrompt = rawPrompt.replace(/--sunburst/gi, '').trim();
+  }
+
+  if (rawPrompt.includes('--portrait')) {
+    width = 768;
+    height = 1024;
+    rawPrompt = rawPrompt.replace(/--portrait/gi, '').trim();
+  } else if (rawPrompt.includes('--landscape')) {
+    width = 1024;
+    height = 768;
+    rawPrompt = rawPrompt.replace(/--landscape/gi, '').trim();
+  }
+
+  const STYLE_CRAFTS = {
+    sunburst: 'ultra-detailed, masterwork, 8k resolution, cinematic lighting, raytracing, sharp focus, refined material realism, high dynamic range',
+    flare: 'vibrant, high contrast, clean composition, studio lighting, highly detailed aesthetic, sharp rendering',
+    anime: 'anime aesthetic, detailed background, Makoto Shinkai lighting, luminous color palette, clean line art, masterpiece',
+    cyber: 'cyberpunk aesthetic, neon illumination, reflective wet surfaces, volumetric smoke, high tech detailing, cinematic depth',
+    '3d': '3d render, octane render, unreal engine 5, photorealistic textures, volumetric subsurface scattering, studio lighting'
+  };
+
+  const extraCraft = STYLE_CRAFTS[modelStyle] || STYLE_CRAFTS.sunburst;
+  const craftedPrompt = `${rawPrompt}, ${extraCraft}`;
+
+  // Check if user attached or replied to an image (Image-to-Image Mode)
+  const isImg = msgType === 'imageMessage';
+  const isQuotedImg = quoted?.type === 'imageMessage';
+  let referenceImageUrl = null;
+
+  if (isImg || isQuotedImg) {
+    // If prompt is meme/laser related, route to handleLaserMeme
+    if (rawPrompt.toLowerCase().includes('laser') || rawPrompt.toLowerCase().includes('meme')) {
+      return handleLaserMeme(sock, m, { jid, q: rawPrompt, cmd, msgType, quoted });
+    }
+
+    try {
+      const mediaMsg = isImg ? m : { message: quoted.raw, key: m.key };
+      const rawBuf = await downloadMediaMessage(mediaMsg, 'buffer', {});
+      referenceImageUrl = await uploadToCatbox(rawBuf, 'ref_image.jpg');
+    } catch {}
+  }
+
+  await sock.sendMessage(jid, {
+    text: `🎨 *[ GPT-IMAGE 2.5 ${referenceImageUrl ? 'IMG2IMG' : 'TEXT2IMG'} ]*\n` +
+      `Sedang merender ilustrasi via *${modelName}*...\n` +
+      `📝 *Prompt:* "${rawPrompt}"\n` +
+      `📐 *Ukuran:* ${width}x${height}` +
+      (referenceImageUrl ? `\n🖼️ *Referensi Foto:* Terdeteksi & diunggah` : '')
+  }, { quoted: m });
+
+  try {
+    const seed = Math.floor(Math.random() * 10000000);
+    let pollinationsUrl = `https://image.pollinations.ai/prompt/${encodeURIComponent(craftedPrompt)}?model=flux&width=${width}&height=${height}&seed=${seed}&nologo=true`;
+    if (referenceImageUrl) {
+      pollinationsUrl += `&image=${encodeURIComponent(referenceImageUrl)}`;
+    }
+
+    const res = await fetch(pollinationsUrl, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        'Accept': 'image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8'
+      },
+      signal: AbortSignal.timeout(35000)
+    });
+
+    if (!res.ok) throw new Error(`Server AI Image mengembalikan status ${res.status}`);
+    const imgBuf = Buffer.from(await res.arrayBuffer());
+
+    await sock.sendMessage(jid, {
+      image: imgBuf,
+      caption: `🎨 *[ GPT-IMAGE 2.5 CRAFT ]*\n\n` +
+        `📝 *Prompt :* "${rawPrompt}"\n` +
+        `⚙️ *Model  :* ${modelName}\n` +
+        `📐 *Ukuran :* ${width}x${height}px\n` +
+        `✨ *Mode   :* ${referenceImageUrl ? 'Image-to-Image (Ref)' : 'Text-to-Image'}`
+    }, { quoted: m });
+  } catch (err) {
+    try {
+      const { searchImage } = await import('../libs/media.js');
+      const backupBuf = await searchImage(rawPrompt);
+      if (backupBuf) {
+        await sock.sendMessage(jid, {
+          image: backupBuf,
+          caption: `🎨 *[ GAMBAR CADANGAN ]*\n\n📝 *Pencarian:* "${rawPrompt}"\n*(Fallback mode aktif)*`
+        }, { quoted: m });
+        return;
+      }
+    } catch {}
+    await sock.sendMessage(jid, { text: `❌ Gagal merender gambar GPT-Image: ${err.message}` }, { quoted: m });
+  }
+}
+
+export async function handleLaserMeme(sock, m, { jid, q, cmd, msgType, quoted }) {
+  const isImg = msgType === 'imageMessage';
+  const isQuotedImg = quoted?.type === 'imageMessage';
+
+  if (!isImg && !isQuotedImg) {
+    return sock.sendMessage(jid, {
+      text: `🔥 *[ LASER EYES MEME GENERATOR ]*\n\n` +
+        `Kirim atau balas foto dengan:\n` +
+        `*${config.prefix}${cmd} <teks meme> [elemen]*\n\n` +
+        `*Contoh Penggunaan:*\n` +
+        `• ${config.prefix}${cmd} BEDAKAN MODEL SAMA BAGIAN DIK!\n` +
+        `• ${config.prefix}${cmd} JANGAN MAIN-MAIN DEK! --petir\n` +
+        `• ${config.prefix}${cmd} DINGIN BANGET HATI INI --air\n\n` +
+        `*Pilihan Elemen:*\n` +
+        `• \`--api\` / (default) : Latar api membara, flowchart SPBE, laser merah\n` +
+        `• \`--air\`             : Latar pusaran air dingin, sirkuit cyan, laser es\n` +
+        `• \`--petir\`           : Latar badai halilintar, kilatan ungu, laser petir`
+    }, { quoted: m });
+  }
+
+  let text = q || 'BEDAKAN MODEL SAMA BAGIAN DIK!';
+  let element = 'api';
+
+  if (text.includes('--air') || text.includes('--water')) {
+    element = 'air';
+    text = text.replace(/--air|--water/gi, '').trim();
+  } else if (text.includes('--petir') || text.includes('--lightning')) {
+    element = 'petir';
+    text = text.replace(/--petir|--lightning/gi, '').trim();
+  } else if (text.includes('--api') || text.includes('--fire')) {
+    element = 'api';
+    text = text.replace(/--api|--fire/gi, '').trim();
+  }
+
+  if (!text) text = 'BEDAKAN MODEL SAMA BAGIAN DIK!';
+
+  await sock.sendMessage(jid, { text: `⚡ Sedang merender meme stiker Laser Eyes (${element.toUpperCase()})...` }, { quoted: m });
+
+  try {
+    const mediaMsg = isImg ? m : { message: quoted.raw, key: m.key };
+    const rawBuf = await downloadMediaMessage(mediaMsg, 'buffer', {});
+
+    const { generateLaserMeme } = await import('../libs/laserMeme.js');
+    const memeBuf = await generateLaserMeme(rawBuf, text, element);
+
+    await sock.sendMessage(jid, {
+      image: memeBuf,
+      caption: `🔥 *[ LASER MEME STICKER ]*\n\n` +
+        `📝 *Teks  :* "${text}"\n` +
+        `⚡ *Elemen:* ${element.toUpperCase()}`
+    }, { quoted: m });
+  } catch (err) {
+    await sock.sendMessage(jid, { text: `❌ Gagal membuat Laser Meme: ${err.message}` }, { quoted: m });
+  }
+}
+
+

@@ -9,10 +9,9 @@ import {
   handleIgStory,
   handleFacebook,
   handleMusicStreaming,
-  handleGenericDownload,
   playSessions
 } from './downloader.js';
-import { handleAI, handleDraw } from './ai.js';
+import { handleAI } from './ai.js';
 import {
   handleC4,
   handleTTT,
@@ -53,7 +52,9 @@ import {
   handleDiary,
   handleCpp,
   handleCodeRunner,
-  handleTextEffect
+  handleTextEffect,
+  handleDraw,
+  handleLaserMeme
 } from './tools.js';
 import {
   handleGoogle,
@@ -178,9 +179,6 @@ export async function dispatchCommand(sock, m, context) {
         return handleGroup(sock, m, context);
       }
       if (sub) {
-        if (sub === 'loli') {
-          return sock.sendMessage(jid, { text: '❌ Permintaan ditolak: Konten eksplisit karakter di bawah umur (loli/shota) dilarang keras.' }, { quoted: m });
-        }
         const resolvedCmd = GALLERY_PACKS[sub] ? sub : (GALLERY_PACKS['nsfw' + sub] ? 'nsfw' + sub : null);
         if (resolvedCmd) {
           return handleGallery(sock, m, { ...context, cmd: resolvedCmd });
@@ -273,10 +271,6 @@ export async function dispatchCommand(sock, m, context) {
     case 'perplexity':
     case 'perp':
       return handleAI(sock, m, context);
-    case 'draw':
-    case 'aiimg':
-    case 'genimg':
-      return handleDraw(sock, m, context);
 
     // 4. Games
     case 'c4':
@@ -436,6 +430,20 @@ export async function dispatchCommand(sock, m, context) {
     case 'ice':
     case 'retro':
       return handleTextEffect(sock, m, context);
+
+    // AI Image Drawing & Prompt Crafting (GPT-Image 2.5 Skill)
+    case 'draw':
+    case 'aiimg':
+    case 'genimg':
+    case 'gptimage':
+      return handleDraw(sock, m, context);
+
+    // Laser Eyes Meme Generator (Meme Compositor)
+    case 'lasermeme':
+    case 'meme':
+    case 'lasereyes':
+    case 'apimeme':
+      return handleLaserMeme(sock, m, context);
 
     // 6. Search
     case 'google':

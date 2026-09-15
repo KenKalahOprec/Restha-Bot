@@ -222,7 +222,6 @@ Ikuti langkah-langkah berikut untuk memasang dan menjalankan bot pada environmen
 | `.restha` | - | `<prompt>` | Asisten AI personal dengan persona Restha |
 | `.ddg` | - | `<prompt>` | Pencarian jawaban AI berbasis DuckDuckGo |
 | `.perplexity` | `.perp` | `<prompt>` | Pencarian jawaban bertenaga web research AI |
-| `.draw` | `.genimg` | `<deskripsi>` | Menghasilkan gambar ilustrasi baru berbasis AI |
 
 ### 03. Interactive Games
 | Perintah | Shortcut | Parameter | Deskripsi |
@@ -246,7 +245,8 @@ Ikuti langkah-langkah berikut untuk memasang dan menjalankan bot pada environmen
 
 ### 04. Tools & Compiler
 | Perintah | Shortcut | Parameter | Deskripsi |
-|---|---|---|---|
+| `.draw` | `.genimg`, `.gptimage` | `<deskripsi>` | Menghasilkan gambar ilustrasi AI (GPT-Image 2.5 Engine) |
+| `.lasermeme` | `.meme`, `.lasereyes` | `<teks>` | Membuat stiker meme laser eyes, flowchart, & efek elemen (reply foto) |
 | `.c` | `.cpp`, `.c++` | `<kode / reply>` | Menjalankan dan mengompilasi kode C/C++ |
 | `.run` | `.code` | `<bahasa> <kode>`| Menjalankan kode multi-bahasa pemrograman |
 | `.py` | - | `<kode Python>` | Menjalankan skrip Python 3 secara terisolasi |

@@ -58,7 +58,6 @@ export const GALLERY_PACKS = {
   nsfwboobs:    { type: 'image' },
   nsfwneko:     { type: 'image' },
   nsfwanal:     { type: 'image' },
-  nsfwloli:     { blocked: true },
 };
 
 const NSFW_DIRECT_APIS = {
@@ -104,10 +103,6 @@ async function fetchPack(packUrl) {
 export async function handleGallery(sock, m, { jid, cmd }) {
   const pack = GALLERY_PACKS[cmd];
   if (!pack) return;
-
-  if (pack.blocked) {
-    return sock.sendMessage(jid, { text: '❌ Permintaan ditolak: Konten eksplisit karakter di bawah umur (loli/shota) dilarang keras.' }, { quoted: m });
-  }
 
   try {
     let mediaUrl = null;
