@@ -245,6 +245,7 @@ Ikuti langkah-langkah berikut untuk memasang dan menjalankan bot pada environmen
 
 ### 04. Tools & Compiler
 | Perintah | Shortcut | Parameter | Deskripsi |
+|---|---|---|---|
 | `.draw` | `.genimg`, `.gptimage` | `<deskripsi>` | Menghasilkan gambar ilustrasi AI (GPT-Image 2.5 Engine) |
 | `.lasermeme` | `.meme`, `.lasereyes` | `<teks>` | Membuat stiker meme laser eyes, flowchart, & efek elemen (reply foto) |
 | `.c` | `.cpp`, `.c++` | `<kode / reply>` | Menjalankan dan mengompilasi kode C/C++ |
