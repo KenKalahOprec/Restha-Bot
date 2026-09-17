@@ -382,7 +382,6 @@ export async function handleBudayaBali(sock, m, { jid, q, cmd }) {
   const isEn = q.includes('--en');
   const cleanQ = q.replace(/--en/gi, '').trim();
   const langLabel = isEn ? 'English' : 'Indonesia';
-  const baseUrl = isEn ? 'https://budayabali.com' : 'https://budayabali.com/id';
   const searchUrl = isEn
     ? `https://budayabali.com/search?q=${encodeURIComponent(cleanQ)}`
     : `https://budayabali.com/id/search?q=${encodeURIComponent(cleanQ)}`;
@@ -392,21 +391,27 @@ export async function handleBudayaBali(sock, m, { jid, q, cmd }) {
   try {
     const res = await fetch(searchUrl, {
       headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)' },
-      signal: AbortSignal.timeout(10000)
+      signal: AbortSignal.timeout(12000)
     });
 
     if (!res.ok) throw new Error('Gagal menghubungi server BudayaBali.com');
     const html = await res.text();
 
-    // 1. Ekstrak daftar artikel dari hasil pencarian
-    const regex = /<h\d[^>]*class="[^"]*title[^"]*"[^>]*>\s*<a[^>]+href="([^"]+)"[^>]*>([\s\S]*?)<\/a>/gi;
-    let match;
+    const itemRegex = /<div[^>]*class="post-item"[^>]*>([\s\S]*?)<\/div>\s*<\/div>/gi;
+    let mItem;
     const articles = [];
-    while ((match = regex.exec(html)) !== null) {
-      const link = match[1];
-      const title = match[2].replace(/<[^>]+>/g, '').replace(/&quot;/g, '"').replace(/&#039;/g, "'").trim();
-      if (!articles.some(a => a.link === link)) {
-        articles.push({ link, title });
+    while ((mItem = itemRegex.exec(html)) !== null) {
+      const block = mItem[1];
+      const link = block.match(/<a[^>]+href="([^"]+)"/i)?.[1];
+      const cover = block.match(/data-src="([^"]+)"/i)?.[1];
+      const title = block.match(/alt="([^"]+)"/i)?.[1]
+        || block.match(/<h3[^>]*class="title"[^>]*>[\s\S]*?<a[^>]*>([\s\S]*?)<\/a>/i)?.[1]?.replace(/<[^>]+>/g, '').trim();
+      const author = block.match(/class="a-username"[^>]*>([\s\S]*?)<\/a>/i)?.[1]?.replace(/<[^>]+>/g, '').trim();
+      const date = block.match(/<span[^>]*>([\s\S]*?)<\/span>/i)?.[1]?.trim();
+      const desc = block.match(/<p[^>]*class="description"[^>]*>([\s\S]*?)<\/p>/i)?.[1]?.replace(/<[^>]+>/g, '').trim();
+
+      if (link && title && !articles.some(a => a.link === link)) {
+        articles.push({ link, cover, title, author, date, desc });
       }
     }
 
@@ -416,41 +421,52 @@ export async function handleBudayaBali(sock, m, { jid, q, cmd }) {
       }, { quoted: m });
     }
 
-    // Prioritaskan artikel yang paling relevan dengan query
     const targetArticle = articles.find(a => a.title.toLowerCase().includes(cleanQ.toLowerCase())) || articles[0];
 
-    // 2. Crawl detail artikel terpilih
-    const artRes = await fetch(targetArticle.link, {
-      headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)' },
-      signal: AbortSignal.timeout(10000)
-    });
-    const artHtml = await artRes.text();
+    let title = targetArticle.title;
+    let snippet = targetArticle.desc || '';
+    let author = targetArticle.author || 'budayabali.com';
+    let published = targetArticle.date || '-';
+    let coverUrl = targetArticle.cover || '';
 
-    const title = artHtml.match(/<meta property="og:title" content="([^"]+)"/)?.[1]
-      || targetArticle.title;
-    const desc = artHtml.match(/<meta property="og:description" content="([^"]+)"/)?.[1] || '';
-    const coverUrl = artHtml.match(/<meta property="og:image" content="([^"]+)"/)?.[1] || '';
-    const author = artHtml.match(/<meta property="article:author" content="([^"]+)"/)?.[1] || 'budayabali.com';
-    const published = artHtml.match(/<meta property="article:published_time" content="([^"]+)"/)?.[1] || '-';
+    try {
+      const artRes = await fetch(targetArticle.link, {
+        headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)' },
+        signal: AbortSignal.timeout(4000)
+      });
+      if (artRes.ok) {
+        const artHtml = await artRes.text();
+        const fullTitle = artHtml.match(/<meta property="og:title" content="([^"]+)"/)?.[1];
+        if (fullTitle) title = fullTitle;
 
-    // Ekstrak paragraf isi artikel
-    const bodyMatch = artHtml.match(/<div[^>]*class="[^"]*post-text[^"]*"[^>]*>([\s\S]*?)<\/div>/i)
-      || artHtml.match(/<div[^>]*class="[^"]*text[^"]*"[^>]*>([\s\S]*?)<\/div>/i)
-      || artHtml.match(/<div[^>]*class="[^"]*entry-content[^"]*"[^>]*>([\s\S]*?)<\/div>/i);
+        const ogDesc = artHtml.match(/<meta property="og:description" content="([^"]+)"/)?.[1];
+        const ogCover = artHtml.match(/<meta property="og:image" content="([^"]+)"/)?.[1];
+        if (ogCover) coverUrl = ogCover;
+        const ogAuthor = artHtml.match(/<meta property="article:author" content="([^"]+)"/)?.[1];
+        if (ogAuthor) author = ogAuthor;
+        const ogPub = artHtml.match(/<meta property="article:published_time" content="([^"]+)"/)?.[1];
+        if (ogPub) published = ogPub;
 
-    let snippet = desc;
-    if (bodyMatch) {
-      const pText = bodyMatch[1]
-        .replace(/<script[\s\S]*?<\/script>/gi, '')
-        .replace(/<style[\s\S]*?<\/style>/gi, '')
-        .replace(/<[^>]+>/g, ' ')
-        .replace(/&nbsp;/g, ' ')
-        .replace(/\s+/g, ' ')
-        .trim();
-      if (pText.length > 50) {
-        snippet = pText.slice(0, 900) + '...';
+        const bodyMatch = artHtml.match(/<div[^>]*class="[^"]*post-text[^"]*"[^>]*>([\s\S]*?)<\/div>/i)
+          || artHtml.match(/<div[^>]*class="[^"]*text[^"]*"[^>]*>([\s\S]*?)<\/div>/i)
+          || artHtml.match(/<div[^>]*class="[^"]*entry-content[^"]*"[^>]*>([\s\S]*?)<\/div>/i);
+
+        if (bodyMatch) {
+          const pText = bodyMatch[1]
+            .replace(/<script[\s\S]*?<\/script>/gi, '')
+            .replace(/<style[\s\S]*?<\/style>/gi, '')
+            .replace(/<[^>]+>/g, ' ')
+            .replace(/&nbsp;/g, ' ')
+            .replace(/\s+/g, ' ')
+            .trim();
+          if (pText.length > 50) {
+            snippet = pText.slice(0, 900) + '...';
+          }
+        } else if (ogDesc) {
+          snippet = ogDesc;
+        }
       }
-    }
+    } catch {}
 
     let caption = `🌺 *[ BUDAYA BALI - PADMA BHUWANA ]*\n`;
     caption += `📖 *Judul*    : ${title}\n`;
@@ -468,12 +484,11 @@ export async function handleBudayaBali(sock, m, { jid, q, cmd }) {
       });
     }
 
-    // 3. Ambil dan kirim gambar cover asli artikel
     if (coverUrl) {
       try {
         const imgRes = await fetch(coverUrl, {
           headers: { 'User-Agent': 'Mozilla/5.0' },
-          signal: AbortSignal.timeout(8000)
+          signal: AbortSignal.timeout(5000)
         });
         if (imgRes.ok) {
           const imgBuf = Buffer.from(await imgRes.arrayBuffer());
@@ -853,12 +868,23 @@ export async function handleLustpress(sock, m, { jid, q, cmd, args }) {
       if (!res.ok) throw new Error('Gagal mengambil data dari PornHub');
 
       const text = await res.text();
-      const phRegex = /\[([^\]]+)\]\((https:\/\/www\.pornhub\.com\/view_video\.php\?viewkey=[a-zA-Z0-9]+)\)/gi;
+      const videoRegex = /\[!\[Image \d*\]\(([^\)]+)\)\]\((https:\/\/www\.pornhub\.com\/view_video\.php\?viewkey=[a-zA-Z0-9]+)\)\s*\[([^\]]+)\]/gi;
       let match;
       const items = [];
-      while ((match = phRegex.exec(text)) !== null && items.length < 5) {
-        if (!items.some(i => i.url === match[2])) {
-          items.push({ url: match[2], title: match[1].trim() });
+      while ((match = videoRegex.exec(text)) !== null && items.length < 5) {
+        items.push({
+          thumb: match[1],
+          url: match[2],
+          title: match[3].trim()
+        });
+      }
+
+      if (!items.length) {
+        const phRegex = /\[([^\]]+)\]\((https:\/\/www\.pornhub\.com\/view_video\.php\?viewkey=[a-zA-Z0-9]+)\)/gi;
+        while ((match = phRegex.exec(text)) !== null && items.length < 5) {
+          if (!items.some(i => i.url === match[2])) {
+            items.push({ thumb: null, url: match[2], title: match[1].trim() });
+          }
         }
       }
 
@@ -873,6 +899,16 @@ export async function handleLustpress(sock, m, { jid, q, cmd, args }) {
         caption += `│ • ${idx + 1}. ${it.title}\n│   ${it.url}\n`;
       });
       caption += `│\n│ • Unduh 360p : ${config.prefix}lpdl <url>\n└──`;
+
+      if (items[0]?.thumb) {
+        try {
+          const tRes = await fetch(items[0].thumb, { signal: AbortSignal.timeout(8000) });
+          if (tRes.ok) {
+            const buf = Buffer.from(await tRes.arrayBuffer());
+            return await sock.sendMessage(jid, { image: buf, caption }, { quoted: m });
+          }
+        } catch {}
+      }
 
       return await sock.sendMessage(jid, { text: caption }, { quoted: m });
     } catch (err) {

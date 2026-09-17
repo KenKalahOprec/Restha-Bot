@@ -11,12 +11,23 @@ import ffmpeg from 'fluent-ffmpeg';
 import ffmpegInstaller from '@ffmpeg-installer/ffmpeg';
 import fs from 'fs';
 import path from 'path';
+import os from 'os';
 import config from './config.js';
 import initialHandler from './src/handlers/message.js';
 import handleGroupParticipantsUpdate from './src/handlers/group.js';
 import { logBanner, logConnection, c } from './src/libs/logger.js';
 
-ffmpeg.setFfmpegPath(ffmpegInstaller.path);
+// Session disimpan di direktori profil user OS agar repo/project bersih tanpa folder ./session
+const SESSION_DIR = process.env.SESSION_DIR || path.join(os.homedir(), '.restha-session');
+if (!fs.existsSync(SESSION_DIR)) {
+  fs.mkdirSync(SESSION_DIR, { recursive: true });
+}
+
+if (ffmpegInstaller?.path && fs.existsSync(ffmpegInstaller.path)) {
+  ffmpeg.setFfmpegPath(ffmpegInstaller.path);
+} else {
+  ffmpeg.setFfmpegPath('ffmpeg');
+}
 
 process.on('uncaughtException', (err) => {
   console.error('[Anti-Crash uncaughtException]:', err?.message || err);
@@ -112,7 +123,7 @@ async function startBot() {
     } catch {}
   }
 
-  const { state, saveCreds } = await useMultiFileAuthState('./session');
+  const { state, saveCreds } = await useMultiFileAuthState(SESSION_DIR);
 
   // If me.id exists but registered is false (can happen after unclean shutdown),
   // mark as registered so Baileys reuses the session instead of showing a new QR.
@@ -142,9 +153,10 @@ async function startBot() {
     syncFullHistory: false,
     markOnlineOnConnect: true,
     fireInitQueries: false,
-    defaultQueryTimeoutMs: 15000,
-    keepAliveIntervalMs: 25000,
-    connectTimeoutMs: 20000,
+    defaultQueryTimeoutMs: 60000,
+    keepAliveIntervalMs: 30000,
+    connectTimeoutMs: 30000,
+    retryRequestDelayMs: 250,
     msgRetryCounterCache: {
       get: (k) => msgRetryCounterCache.get(k),
       set: (k, v) => msgRetryCounterCache.set(k, v),
@@ -192,8 +204,8 @@ async function startBot() {
       if (statusCode === DisconnectReason.loggedOut) {
         logConnection('info', 'Sesi tidak valid / logout. Menghapus sesi & restart...');
         try {
-          fs.rmSync(path.resolve('./session'), { recursive: true, force: true });
-          fs.mkdirSync(path.resolve('./session'), { recursive: true });
+          fs.rmSync(SESSION_DIR, { recursive: true, force: true });
+          fs.mkdirSync(SESSION_DIR, { recursive: true });
         } catch {}
         pairingRequested = false;
         setTimeout(startBot, 2000);

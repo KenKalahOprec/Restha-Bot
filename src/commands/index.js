@@ -53,7 +53,9 @@ import {
   handleCpp,
   handleCodeRunner,
   handleTextEffect,
-  handleDraw
+  handleDraw,
+  handleRemoveBg,
+  handleILovePdf
 } from './tools.js';
 import {
   handleGoogle,
@@ -339,6 +341,10 @@ export async function dispatchCommand(sock, m, context) {
     case 'hd':
     case 'upscale':
       return handleRemini(sock, m, context);
+    case 'removebg':
+    case 'rmbg':
+    case 'nobg':
+      return handleRemoveBg(sock, m, context);
     case 'bratvid':
     case 'bratvideo':
     case 'bvid':
@@ -358,6 +364,7 @@ export async function dispatchCommand(sock, m, context) {
     case 'nuliskiri':
     case 'nuliskanan':
     case 'folio':
+    case 'folio2':
     case 'foliokiri':
     case 'foliokanan':
       return handleNulis(sock, m, context);
@@ -438,6 +445,37 @@ export async function dispatchCommand(sock, m, context) {
     case 'genimg':
     case 'gptimage':
       return handleDraw(sock, m, context);
+
+    // iLovePDF Suite (Peralatan Dokumen & Konversi PDF)
+    case 'ilovepdf':
+    case 'pdf':
+    case 'pdfinfo':
+    case 'pdfrotate':
+    case 'pdfsplit':
+    case 'pdfdel':
+    case 'pdfremove':
+    case 'pdfwm':
+    case 'pdfwatermark':
+    case 'pdfpage':
+    case 'pdfnumber':
+    case 'pdfcompress':
+    case 'topdf':
+    case 'jpg2pdf':
+    case 'img2pdf':
+    case 'wordtopdf':
+    case 'word2pdf':
+    case 'doc2pdf':
+    case 'docx2pdf':
+    case 'exceltopdf':
+    case 'excel2pdf':
+    case 'xls2pdf':
+    case 'xlsx2pdf':
+    case 'htmltopdf':
+    case 'html2pdf':
+    case 'pdf2md':
+    case 'pdfmarkdown':
+    case 'pdftomarkdown':
+      return handleILovePdf(sock, m, context);
 
     // 6. Search
     case 'google':
@@ -674,6 +712,10 @@ export async function dispatchCommand(sock, m, context) {
     case 'vignette':
     case 'magick':
     case 'im':
+    case 'emojimix':
+    case 'emomix':
+    case 'mixemo':
+    case 'mix':
       return handleMedia(sock, m, context);
 
     // 10. Owner & System
@@ -716,6 +758,9 @@ export async function dispatchCommand(sock, m, context) {
     case 'listuser':
     case 'listu':
     case 'whitelist':
+    case 'pm2':
+    case 'pm2status':
+    case 'pm2logs':
     case 'restart':
     case 'reboot':
     case 'shutdown':
@@ -752,6 +797,7 @@ export async function dispatchCommand(sock, m, context) {
     case 'film':
     case 'movie':
     case 'drakor':
+    case 'kdrama':
     case 'fm':
       return handleFilm(sock, m, context);
 

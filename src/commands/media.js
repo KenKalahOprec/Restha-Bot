@@ -280,6 +280,57 @@ export async function handleMedia(sock, m, { jid, cmd, args, q, msgType, quoted 
       }
       break;
     }
-  }
+
+    case 'emojimix':
+    case 'emomix':
+    case 'mixemo':
+    case 'mix': {
+      const segmenter = new Intl.Segmenter('en', { granularity: 'grapheme' });
+      const segments = [...segmenter.segment(q || '')].map(s => s.segment);
+      const emojis = segments.filter(char => /\p{Extended_Pictographic}/u.test(char));
+
+      if (emojis.length < 2) {
+        return sock.sendMessage(jid, {
+          text: `┌── [ EMOJI MIX STICKER ]\n` +
+            `│ • Gabungkan 2 emoji menjadi stiker unik\n` +
+            `│ • Format : ${config.prefix}${cmd} <emot1> <emot2>\n` +
+            `│\n` +
+            `│ • Contoh :\n` +
+            `│   ${config.prefix}${cmd} 😂 😡\n` +
+            `│   ${config.prefix}${cmd} 🐱 🔥\n` +
+            `│   ${config.prefix}${cmd} 💀 ❤️\n` +
+            `└──`
+        }, { quoted: m });
+      }
+
+      const e1 = emojis[0];
+      const e2 = emojis[1];
+
+      await sock.sendMessage(jid, {
+        text: `┌── [ MIXING EMOJI ]\n│ • Komposisi : ${e1} + ${e2}\n│ • Status    : Menggabungkan & merender stiker...\n└──`
+      }, { quoted: m });
+
+      try {
+        const mixUrl = `https://emojik.vercel.app/s/${encodeURIComponent(e1)}_${encodeURIComponent(e2)}?size=512`;
+        const res = await fetch(mixUrl, { signal: AbortSignal.timeout(10000) });
+
+        if (!res.ok) {
+          throw new Error(`Kombinasi emoji ${e1} dan ${e2} tidak didukung.`);
+        }
+
+        const pngBuf = Buffer.from(await res.arrayBuffer());
+        const pack = config.stickerPack || 'Emoji Kitchen';
+        const author = config.stickerAuthor || 'Restha';
+        const stickerBuffer = await createStickerImage(pngBuf, { pack, author, quality: 90 });
+
+        await sock.sendMessage(jid, { sticker: stickerBuffer }, { quoted: m });
+      } catch (err) {
+        await sock.sendMessage(jid, {
+          text: `┌── [ EMOJI MIX ERROR ]\n│ • ${err.message}\n└──`
+        }, { quoted: m });
+      }
+      break;
+    }
+    }
 }
 

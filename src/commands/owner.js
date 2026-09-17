@@ -495,10 +495,50 @@ Gunakan:
       break;
     }
 
+    case 'pm2':
+    case 'pm2status': {
+      const isPm2 = process.env.pm_id !== undefined;
+      let text = `┌── [ PM2 PROCESS MANAGER ]\n`;
+      text += `│ • Status PM2 : ${isPm2 ? 'ONLINE (Managed)' : 'STANDALONE / MANUAL'}\n`;
+      if (isPm2) {
+        text += `│ • Process ID : ${process.env.pm_id}\n`;
+        text += `│ • App Name   : ${process.env.name || 'restha'}\n`;
+        text += `│ • Restarts   : ${process.env.restart_time || 0}\n`;
+      }
+      text += `│ • RAM Heap   : ${(process.memoryUsage().heapUsed / 1024 / 1024).toFixed(1)} MB\n`;
+      text += `│ • RAM RSS    : ${(process.memoryUsage().rss / 1024 / 1024).toFixed(1)} MB\n`;
+      text += `│ • Uptime     : ${Math.floor(process.uptime())}s\n`;
+      text += `└──`;
+      await sock.sendMessage(jid, { text }, { quoted: m });
+      break;
+    }
+
+    case 'pm2logs': {
+      const logPath = path.join(os.homedir(), '.pm2', 'logs', 'restha-out.log');
+      const errPath = path.join(os.homedir(), '.pm2', 'logs', 'restha-error.log');
+      let logContent = '';
+      try {
+        if (fs.existsSync(logPath)) {
+          const lines = fs.readFileSync(logPath, 'utf8').trim().split('\n');
+          logContent = lines.slice(-15).join('\n');
+        }
+      } catch {}
+      if (!logContent && fs.existsSync(errPath)) {
+        try {
+          const lines = fs.readFileSync(errPath, 'utf8').trim().split('\n');
+          logContent = lines.slice(-15).join('\n');
+        } catch {}
+      }
+      const text = `┌── [ PM2 REALTIME LOGS ]\n${logContent || 'Belum ada log tercatat.'}\n└──`;
+      await sock.sendMessage(jid, { text }, { quoted: m });
+      break;
+    }
+
     case 'restart':
     case 'reboot': {
+      const isPm2 = process.env.pm_id !== undefined;
       await sock.sendMessage(jid, {
-        text: '🔄 *[ RESTARTING BOT ]*\nMenutup sesi aktif dan merestart proses bot...'
+        text: `🔄 *[ RESTARTING BOT ]*\nMenutup sesi aktif dan merestart proses bot...${isPm2 ? '\n(Dimanajeri oleh PM2 Daemon)' : ''}`
       }, { quoted: m });
 
       setTimeout(() => {
@@ -506,16 +546,17 @@ Gunakan:
           sock?.ws?.close();
         } catch {}
 
-        // Spawn instance bot baru
-        const child = spawn(process.argv[0], process.argv.slice(1), {
-          cwd: process.cwd(),
-          detached: true,
-          stdio: 'inherit'
-        });
-        child.unref();
-
-        // Keluar dari proses lama
-        process.exit(0);
+        if (isPm2) {
+          process.exit(0);
+        } else {
+          const child = spawn(process.argv[0], process.argv.slice(1), {
+            cwd: process.cwd(),
+            detached: true,
+            stdio: 'inherit'
+          });
+          child.unref();
+          process.exit(0);
+        }
       }, 1500);
       break;
     }
@@ -524,6 +565,7 @@ Gunakan:
     case 'stop':
     case 'off':
     case 'matikan': {
+      const isPm2 = process.env.pm_id !== undefined;
       await sock.sendMessage(jid, {
         text: '🛑 *[ SHUTDOWN BOT ]*\nMenutup sesi WhatsApp dan mematikan sistem bot...'
       }, { quoted: m });
@@ -532,6 +574,13 @@ Gunakan:
         try {
           sock?.ws?.close();
         } catch {}
+
+        if (isPm2) {
+          try {
+            const pm2Cmd = process.platform === 'win32' ? 'pm2.cmd' : 'pm2';
+            spawn(pm2Cmd, ['stop', process.env.name || 'restha'], { detached: true, stdio: 'ignore' }).unref();
+          } catch {}
+        }
         process.exit(0);
       }, 1500);
       break;

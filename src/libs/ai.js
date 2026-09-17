@@ -2,7 +2,7 @@ import config from '../../config.js';
 
 export async function askAI(prompt, systemInstruction = null) {
   if (config.geminiApiKey) {
-    const models = ['gemini-3.7-flash', 'gemini-2.0-flash', 'gemini-1.5-flash'];
+    const models = ['gemini-3.6-flash', 'gemini-2.5-flash', 'gemini-2.5-flash-lite', 'gemini-3.7-flash'];
     for (const model of models) {
       try {
         const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${config.geminiApiKey}`;

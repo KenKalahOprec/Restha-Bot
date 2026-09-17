@@ -9,7 +9,8 @@ import path from 'path';
 import os from 'os';
 import { ShazamAPI } from './shazam-api.js';
 
-ffmpeg.setFfmpegPath(ffmpegInstaller.path);
+export const FFMPEG_BIN = (ffmpegInstaller?.path && fs.existsSync(ffmpegInstaller.path)) ? ffmpegInstaller.path : 'ffmpeg';
+ffmpeg.setFfmpegPath(FFMPEG_BIN);
 
 let menuGifBuffer = null;
 const MENU_GIF_URL = 'https://media.giphy.com/media/CchzkJJ6UrQmQ/giphy.mp4';
@@ -23,6 +24,66 @@ export async function getMenuGif() {
       return menuGifBuffer;
     }
   } catch {}
+  return null;
+}
+
+let nsfwMenuImageCache = null;
+let nsfwMenuImageTime = 0;
+
+export async function getNsfwMenuImage() {
+  const now = Date.now();
+  if (nsfwMenuImageCache && (now - nsfwMenuImageTime < 300000)) {
+    return nsfwMenuImageCache;
+  }
+
+  try {
+    const res = await fetch('https://nekobot.xyz/api/image?type=hentai', {
+      headers: { 'User-Agent': 'Mozilla/5.0' },
+      signal: AbortSignal.timeout(5000)
+    });
+    if (res.ok) {
+      const data = await res.json();
+      if (data?.message) {
+        const imgRes = await fetch(data.message, {
+          headers: { 'User-Agent': 'Mozilla/5.0' },
+          signal: AbortSignal.timeout(7000)
+        });
+        if (imgRes.ok) {
+          nsfwMenuImageCache = Buffer.from(await imgRes.arrayBuffer());
+          nsfwMenuImageTime = now;
+          return nsfwMenuImageCache;
+        }
+      }
+    }
+  } catch {}
+
+  try {
+    const svg = `
+<svg width="800" height="400" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0a0510"/>
+      <stop offset="50%" stop-color="#180a22"/>
+      <stop offset="100%" stop-color="#050508"/>
+    </linearGradient>
+    <linearGradient id="glow" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#ff0055"/>
+      <stop offset="100%" stop-color="#7928ca"/>
+    </linearGradient>
+  </defs>
+  <rect width="100%" height="100%" fill="url(#bg)"/>
+  <rect x="20" y="20" width="760" height="360" rx="16" fill="none" stroke="url(#glow)" stroke-width="2" stroke-opacity="0.6"/>
+  <text x="50%" y="150" font-family="Courier, monospace, sans-serif" font-size="38" font-weight="900" fill="#ffffff" text-anchor="middle" letter-spacing="4">RESTHA // RESTRICTED</text>
+  <text x="50%" y="200" font-family="Courier, monospace, sans-serif" font-size="22" font-weight="700" fill="#ff0055" text-anchor="middle" letter-spacing="6">[ ADULT ACCESS - 18+ ONLY ]</text>
+  <line x1="150" y1="235" x2="650" y2="235" stroke="#ff0055" stroke-width="2" stroke-opacity="0.5"/>
+  <text x="50%" y="280" font-family="Courier, monospace, sans-serif" font-size="14" fill="#a0a0b0" text-anchor="middle" letter-spacing="2">XNXX • PORNHUB • EPORNER • HENTAI • DOUJIN</text>
+  <text x="50%" y="315" font-family="Courier, monospace, sans-serif" font-size="12" fill="#666677" text-anchor="middle">AUTHORIZED OPERATORS ONLY</text>
+</svg>`;
+    nsfwMenuImageCache = await sharp(Buffer.from(svg)).png().toBuffer();
+    nsfwMenuImageTime = now;
+    return nsfwMenuImageCache;
+  } catch {}
+
   return null;
 }
 
@@ -264,10 +325,11 @@ export async function downloadVideoWithMeta(url) {
   } catch {}
 
   await ytdlp(query, {
-    format: 'bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best',
-    ffmpegLocation: ffmpegInstaller.path,
+    format: 'bestvideo[height<=720][ext=mp4]+bestaudio[ext=m4a]/best[height<=720][ext=mp4]/best[height<=720]/best',
+    ffmpegLocation: FFMPEG_BIN,
     output: tmpOut,
-    noPlaylist: true
+    noPlaylist: true,
+    concurrentFragments: 4
   });
   const buf = await fs.promises.readFile(tmpOut);
   await fs.promises.unlink(tmpOut).catch(() => {});
@@ -286,9 +348,10 @@ export async function downloadAnime360p(url) {
 
   await ytdlp(query, {
     format: 'bestvideo[height<=360][ext=mp4]+bestaudio[ext=m4a]/best[height<=360][ext=mp4]/best[height<=360]/best',
-    ffmpegLocation: ffmpegInstaller.path,
+    ffmpegLocation: FFMPEG_BIN,
     output: tmpOut,
-    noPlaylist: true
+    noPlaylist: true,
+    concurrentFragments: 4
   });
   const buf = await fs.promises.readFile(tmpOut);
   await fs.promises.unlink(tmpOut).catch(() => {});
@@ -311,8 +374,9 @@ export async function downloadMediaPlaylist(url) {
 
   try {
     await ytdlp(url, {
-      ffmpegLocation: ffmpegInstaller.path,
-      output: outPattern
+      ffmpegLocation: FFMPEG_BIN,
+      output: outPattern,
+      concurrentFragments: 4
     });
   } catch (err) {
     // yt-dlp returns non-zero status when downloading mixed media/partial items,
@@ -331,8 +395,7 @@ export async function downloadSpotifySpotdl(query) {
   const tmpDir = path.join(os.tmpdir(), `spotdl_${Date.now()}_${Math.random().toString(36).slice(2)}`);
   fs.mkdirSync(tmpDir, { recursive: true });
 
-  const ffmpegPath = ffmpegInstaller.path;
-  const spotdlCmd = `python -m spotdl "${query}" --output "{title}.{output-ext}" --ffmpeg "${ffmpegPath}"`;
+  const spotdlCmd = `python -m spotdl "${query}" --output "{title}.{output-ext}" --ffmpeg "${FFMPEG_BIN}"`;
 
   return new Promise((resolve, reject) => {
     const proc = spawn(spotdlCmd, { shell: true, cwd: tmpDir });
@@ -372,28 +435,29 @@ export async function downloadSpotifySpotdl(query) {
 export async function downloadAudioUrl(url) {
   const isUrl = url.startsWith('http');
   const query = isUrl ? url : `ytsearch1:${url}`;
-  const tmpOut = path.join(os.tmpdir(), `audio_${Date.now()}_${Math.random().toString(36).slice(2)}.mp3`);
+  const tmpOut = path.join(os.tmpdir(), `audio_${Date.now()}_${Math.random().toString(36).slice(2)}.m4a`);
+  const dlOptions = {
+    format: 'bestaudio[ext=m4a]/bestaudio/best',
+    ffmpegLocation: FFMPEG_BIN,
+    output: tmpOut,
+    noPlaylist: true,
+    concurrentFragments: 4
+  };
+
   try {
-    await ytdlp(query, {
-      extractAudio: true,
-      audioFormat: 'mp3',
-      audioQuality: 0,
-      ffmpegLocation: ffmpegInstaller.path,
-      output: tmpOut,
-      noPlaylist: true
-    });
+    await ytdlp(query, dlOptions);
   } catch (err) {
     if (!isUrl) {
+      await ytdlp(url, dlOptions);
+    } else {
       await ytdlp(url, {
         extractAudio: true,
-        audioFormat: 'mp3',
-        audioQuality: 0,
-        ffmpegLocation: ffmpegInstaller.path,
+        audioFormat: 'm4a',
+        ffmpegLocation: FFMPEG_BIN,
         output: tmpOut,
-        noPlaylist: true
+        noPlaylist: true,
+        concurrentFragments: 4
       });
-    } else {
-      throw err;
     }
   }
 
@@ -976,3 +1040,13 @@ export const IMAGEMAGICK_EFFECTS = {
   wave: (buf, val = '10x100') => applyImageMagick(buf, ['-wave', String(val)]),
   vignette: (buf, val = '0x20') => applyImageMagick(buf, ['-vignette', String(val).includes('x') ? val : `0x${val}`])
 };
+
+export async function removeBackground(buffer, fuzzPercent = 20) {
+  const fuzz = `${Math.min(100, Math.max(1, parseInt(fuzzPercent, 10) || 20))}%`;
+  const magickArgs = [
+    '-fuzz', fuzz,
+    '-fill', 'none',
+    '-draw', 'color 0,0 floodfill'
+  ];
+  return await applyImageMagick(buffer, magickArgs, 'png');
+}

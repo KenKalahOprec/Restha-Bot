@@ -7,7 +7,8 @@ import {
   generateIqcImage,
   generateNulisImage,
   generateNulisBookImage,
-  uploadToCatbox
+  uploadToCatbox,
+  removeBackground
 } from '../libs/media.js';
 import { askAI } from '../libs/ai.js';
 
@@ -17,16 +18,62 @@ export async function handleRemini(sock, m, { jid, cmd, msgType, quoted }) {
   const isImg = msgType === 'imageMessage';
   const isQuotedImg = quoted?.type === 'imageMessage';
   if (!isImg && !isQuotedImg) {
-    return sock.sendMessage(jid, { text: `Kirim atau balas gambar dengan *${config.prefix}${cmd}* untuk meningkatkan resolusi menjadi Ultra HD.` }, { quoted: m });
+    return sock.sendMessage(jid, {
+      text: `┌── [ REMINI ULTRA HD ]\n│ • Kirim atau balas gambar dengan ${config.prefix}${cmd}\n│ • Meningkatkan resolusi & ketajaman gambar\n└──`
+    }, { quoted: m });
   }
-  await sock.sendMessage(jid, { text: '✨ Sedang meningkatkan resolusi dan ketajaman gambar (Remini HD)...' }, { quoted: m });
+  await sock.sendMessage(jid, {
+    text: `┌── [ PROCESSING REMINI ]\n│ • Status : Sedang meningkatkan resolusi ke Ultra HD...\n└──`
+  }, { quoted: m });
   try {
     const mediaMsg = isImg ? m : { message: quoted.raw, key: m.key };
     const rawBuf = await downloadMediaMessage(mediaMsg, 'buffer', {});
     const hdBuf = await enhanceRemini(rawBuf);
-    await sock.sendMessage(jid, { image: hdBuf, caption: '✨ *Hasil Remini Ultra HD*\nResolusi ditingkatkan dengan ketajaman maksimal.' }, { quoted: m });
+    await sock.sendMessage(jid, {
+      image: hdBuf,
+      caption: `┌── [ REMINI ULTRA HD COMPLETED ]\n│ • Resolusi ditingkatkan dengan ketajaman maksimal\n└──`
+    }, { quoted: m });
   } catch (err) {
-    await sock.sendMessage(jid, { text: `Gagal memproses Remini: ${err.message}` }, { quoted: m });
+    await sock.sendMessage(jid, {
+      text: `┌── [ REMINI ERROR ]\n│ • Gagal memproses Remini: ${err.message}\n└──`
+    }, { quoted: m });
+  }
+}
+
+export async function handleRemoveBg(sock, m, { jid, cmd, q, msgType, quoted }) {
+  const isImg = msgType === 'imageMessage';
+  const isQuotedImg = quoted?.type === 'imageMessage';
+  if (!isImg && !isQuotedImg) {
+    return sock.sendMessage(jid, {
+      text: `┌── [ REMOVE BACKGROUND ]\n` +
+        `│ • Kirim atau balas gambar dengan ${config.prefix}${cmd} [toleransi%]\n` +
+        `│ • Menghapus background gambar secara otomatis via ImageMagick\n` +
+        `│\n` +
+        `│ • Contoh:\n` +
+        `│   ${config.prefix}removebg (default 20%)\n` +
+        `│   ${config.prefix}nobg 30 (toleransi 30%)\n` +
+        `└──`
+    }, { quoted: m });
+  }
+
+  const fuzzVal = parseInt(q?.trim(), 10) || 20;
+  await sock.sendMessage(jid, {
+    text: `┌── [ REMOVING BACKGROUND ]\n│ • Engine    : ImageMagick Core\n│ • Toleransi : ${fuzzVal}%\n│ • Status    : Sedang memotong latar belakang...\n└──`
+  }, { quoted: m });
+
+  try {
+    const mediaMsg = isImg ? m : { message: quoted.raw, key: m.key };
+    const rawBuf = await downloadMediaMessage(mediaMsg, 'buffer', {});
+    const noBgBuf = await removeBackground(rawBuf, fuzzVal);
+
+    await sock.sendMessage(jid, {
+      image: noBgBuf,
+      caption: `┌── [ REMOVE BG COMPLETED ]\n│ • Engine    : ImageMagick\n│ • Toleransi : ${fuzzVal}%\n│ • Format    : PNG Transparan\n└──`
+    }, { quoted: m });
+  } catch (err) {
+    await sock.sendMessage(jid, {
+      text: `┌── [ REMOVE BG ERROR ]\n│ • Gagal menghapus background: ${err.message}\n└──`
+    }, { quoted: m });
   }
 }
 
@@ -455,23 +502,26 @@ export async function handleTextEffect(sock, m, { jid, cmd, q, quoted }) {
   }
 }
 
-export async function handleDraw(sock, m, { jid, q, cmd }) {
+export async function handleDraw(sock, m, { jid, q, cmd, msgType, quoted }) {
   if (!q) {
     return sock.sendMessage(jid, {
-      text: `🎨 *[ GPT-IMAGE 2.5 ENGINE ]*\n\n` +
-        `*Format:* *${config.prefix}${cmd} <deskripsi visual> [opsi]*\n\n` +
-        `*Contoh:* \n` +
-        `• ${config.prefix}${cmd} samurai di tengah kota neo tokyo saat hujan\n` +
-        `• ${config.prefix}${cmd} kastil fantasi di atas awan --anime\n` +
-        `• ${config.prefix}${cmd} poster mobil balap masa depan --portrait\n\n` +
-        `*Preset Model (GPT-Image 2.5 Skill):*\n` +
-        `• \`--flare\`    : Generasi cepat, warna dinamis & tajam\n` +
-        `• \`--sunburst\` : Ketelitian tinggi, raytracing & tekstur realistis (default)\n` +
-        `• \`--anime\`    : Estetika anime ala Makoto Shinkai\n` +
-        `• \`--cyber\`    : Gaya neon cyberpunk & pantulan basah\n` +
-        `• \`--3d\`       : Render 3D Octane / Unreal Engine 5\n` +
-        `• \`--portrait\` : Rasio vertikal (768x1024)\n` +
-        `• \`--landscape\`: Rasio horizontal (1024x768)`
+      text: `┌── [ GPT-IMAGE 2.5 ENGINE ]\n` +
+        `│ • Format : ${config.prefix}${cmd} <deskripsi visual> [opsi]\n` +
+        `│\n` +
+        `│ • Contoh :\n` +
+        `│   ${config.prefix}${cmd} samurai di tengah kota neo tokyo saat hujan\n` +
+        `│   ${config.prefix}${cmd} kastil fantasi di atas awan --anime\n` +
+        `│   ${config.prefix}${cmd} poster mobil balap masa depan --portrait\n` +
+        `│\n` +
+        `│ [ PRESET MODEL ]\n` +
+        `│ • --flare    : Generasi cepat, warna dinamis & tajam\n` +
+        `│ • --sunburst : Ketelitian tinggi, raytracing & tekstur realistis (default)\n` +
+        `│ • --anime    : Estetika anime ala Makoto Shinkai\n` +
+        `│ • --cyber    : Gaya neon cyberpunk & pantulan basah\n` +
+        `│ • --3d       : Render 3D Octane / Unreal Engine 5\n` +
+        `│ • --portrait : Rasio vertikal (768x1024)\n` +
+        `│ • --landscape: Rasio horizontal (1024x768)\n` +
+        `└──`
     }, { quoted: m });
   }
 
@@ -536,11 +586,12 @@ export async function handleDraw(sock, m, { jid, q, cmd }) {
   }
 
   await sock.sendMessage(jid, {
-    text: `🎨 *[ GPT-IMAGE 2.5 ${referenceImageUrl ? 'IMG2IMG' : 'TEXT2IMG'} ]*\n` +
-      `Sedang merender ilustrasi via *${modelName}*...\n` +
-      `📝 *Prompt:* "${rawPrompt}"\n` +
-      `📐 *Ukuran:* ${width}x${height}` +
-      (referenceImageUrl ? `\n🖼️ *Referensi Foto:* Terdeteksi & diunggah` : '')
+    text: `┌── [ GPT-IMAGE 2.5 ${referenceImageUrl ? 'IMG2IMG' : 'TEXT2IMG'} ]\n` +
+      `│ • Status  : Merender ilustrasi via ${modelName}...\n` +
+      `│ • Prompt  : "${rawPrompt}"\n` +
+      `│ • Ukuran  : ${width}x${height}px` +
+      (referenceImageUrl ? `\n│ • Ref-Img : Terdeteksi & diunggah` : '') +
+      `\n└──`
   }, { quoted: m });
 
   try {
@@ -563,11 +614,12 @@ export async function handleDraw(sock, m, { jid, q, cmd }) {
 
     await sock.sendMessage(jid, {
       image: imgBuf,
-      caption: `🎨 *[ GPT-IMAGE 2.5 CRAFT ]*\n\n` +
-        `📝 *Prompt :* "${rawPrompt}"\n` +
-        `⚙️ *Model  :* ${modelName}\n` +
-        `📐 *Ukuran :* ${width}x${height}px\n` +
-        `✨ *Mode   :* ${referenceImageUrl ? 'Image-to-Image (Ref)' : 'Text-to-Image'}`
+      caption: `┌── [ GPT-IMAGE 2.5 CRAFT ]\n` +
+        `│ • Prompt : "${rawPrompt}"\n` +
+        `│ • Model  : ${modelName}\n` +
+        `│ • Ukuran : ${width}x${height}px\n` +
+        `│ • Mode   : ${referenceImageUrl ? 'Image-to-Image (Ref)' : 'Text-to-Image'}\n` +
+        `└──`
     }, { quoted: m });
   } catch (err) {
     try {
@@ -576,14 +628,397 @@ export async function handleDraw(sock, m, { jid, q, cmd }) {
       if (backupBuf) {
         await sock.sendMessage(jid, {
           image: backupBuf,
-          caption: `🎨 *[ GAMBAR CADANGAN ]*\n\n📝 *Pencarian:* "${rawPrompt}"\n*(Fallback mode aktif)*`
+          caption: `┌── [ GAMBAR CADANGAN ]\n│ • Pencarian : "${rawPrompt}"\n│ • Catatan   : Fallback mode aktif\n└──`
         }, { quoted: m });
         return;
       }
     } catch {}
-    await sock.sendMessage(jid, { text: `❌ Gagal merender gambar GPT-Image: ${err.message}` }, { quoted: m });
+    await sock.sendMessage(jid, {
+      text: `┌── [ DRAW ERROR ]\n│ • Gagal merender gambar GPT-Image: ${err.message}\n└──`
+    }, { quoted: m });
   }
 }
 
+// ─── iLovePDF Suite (Peralatan PDF Online Lengkap) ──────────────────────────
+export async function handleILovePdf(sock, m, { jid, cmd, q, args, msgType, quoted }) {
+  const isDoc = msgType === 'documentMessage';
+  const isQuotedDoc = quoted?.type === 'documentMessage';
+  const isImg = msgType === 'imageMessage';
+  const isQuotedImg = quoted?.type === 'imageMessage';
 
+  const subCmd = (cmd === 'ilovepdf' || cmd === 'pdf') ? (args[0] || '').toLowerCase() : cmd;
+  const param = (cmd === 'ilovepdf' || cmd === 'pdf') ? args.slice(1).join(' ').trim() : (q || '').trim();
 
+  // Menu Help jika tidak ada input
+  if (!subCmd || subCmd === 'help' || (!isDoc && !isQuotedDoc && !isImg && !isQuotedImg && !param)) {
+    return sock.sendMessage(jid, {
+      text: `┌── [ ILOVEPDF SUITE ]\n` +
+        `│ • Peralatan PDF lengkap & pengolahan dokumen\n` +
+        `│\n` +
+        `│ [ FITUR & PERINTAH ]\n` +
+        `│ • ${config.prefix}pdfinfo (reply PDF) : Info detail & jumlah halaman\n` +
+        `│ • ${config.prefix}pdfrotate [derajat] (reply PDF) : Putar halaman (90, 180, 270)\n` +
+        `│ • ${config.prefix}pdfsplit <hal/rentang> (reply PDF) : Pisahkan hal (mis: 1-3 atau 2,4)\n` +
+        `│ • ${config.prefix}pdfdel <hal/rentang> (reply PDF) : Hapus hal (mis: 2 atau 1,4)\n` +
+        `│ • ${config.prefix}pdfwm <teks watermark> (reply PDF) : Beri tanda air transparan\n` +
+        `│ • ${config.prefix}pdfpage (reply PDF) : Tambahkan nomor halaman otomatis\n` +
+        `│ • ${config.prefix}pdfcompress (reply PDF) : Optimalkan & kompres dokumen PDF\n` +
+        `│ • ${config.prefix}pdf2md (reply PDF) : Ekstrak teks PDF ke format Markdown (.md)\n` +
+        `│ • ${config.prefix}topdf / ${config.prefix}jpg2pdf (reply foto) : Konversi gambar ke PDF\n` +
+        `│ • ${config.prefix}word2pdf (reply docx) : Konversi dokumen Word ke PDF\n` +
+        `│ • ${config.prefix}excel2pdf (reply xlsx) : Konversi spreadsheet Excel ke PDF\n` +
+        `│ • ${config.prefix}html2pdf <html/url> : Konversi kode HTML / Web ke PDF\n` +
+        `│\n` +
+        `│ • Shortcut utama : ${config.prefix}pdf <opsi> atau langsung ${config.prefix}<nama_fitur>\n` +
+        `└──`
+    }, { quoted: m });
+  }
+
+  // 1. FITUR: HTML ke PDF (HTML to PDF)
+  if (subCmd === 'htmltopdf' || subCmd === 'html2pdf') {
+    let htmlContent = param || (quoted?.body?.text || quoted?.raw?.conversation || '');
+
+    if (/^https?:\/\//i.test(htmlContent)) {
+      await sock.sendMessage(jid, {
+        text: `┌── [ FETCHING HTML ]\n│ • URL    : ${htmlContent}\n│ • Status : Mengambil kode halaman web...\n└──`
+      }, { quoted: m });
+      try {
+        const hRes = await fetch(htmlContent, { headers: { 'User-Agent': 'Mozilla/5.0' }, signal: AbortSignal.timeout(12000) });
+        if (!hRes.ok) throw new Error(`HTTP ${hRes.status}`);
+        htmlContent = await hRes.text();
+      } catch (err) {
+        return sock.sendMessage(jid, {
+          text: `┌── [ FETCH ERROR ]\n│ • Gagal mengambil HTML dari URL: ${err.message}\n└──`
+        }, { quoted: m });
+      }
+    }
+
+    if (!htmlContent) {
+      return sock.sendMessage(jid, {
+        text: `┌── [ HTML TO PDF ]\n│ • Masukkan teks/kode HTML atau tautan web, atau reply pesan HTML dengan ${config.prefix}${cmd}\n│ • Contoh: ${config.prefix}html2pdf <h1>Judul</h1><p>Konten paragraf</p>\n└──`
+      }, { quoted: m });
+    }
+
+    await sock.sendMessage(jid, {
+      text: `┌── [ CONVERTING HTML ]\n│ • Engine : iLovePDF HTML Engine\n│ • Status : Memformat tata letak HTML ke PDF A4...\n└──`
+    }, { quoted: m });
+
+    try {
+      const { htmlToPdf } = await import('../libs/ilovepdf.js');
+      const pdfBytes = await htmlToPdf(htmlContent);
+
+      return await sock.sendMessage(jid, {
+        document: pdfBytes,
+        mimetype: 'application/pdf',
+        fileName: `html_converted_${Date.now()}.pdf`,
+        caption: `┌── [ HTML CONVERTED ]\n│ • Format : Dokumen PDF A4 dari HTML\n│ • Ukuran : ${(pdfBytes.length / 1024).toFixed(1)} KB\n└──`
+      }, { quoted: m });
+    } catch (err) {
+      return sock.sendMessage(jid, {
+        text: `┌── [ HTML CONVERT ERROR ]\n│ • ${err.message}\n└──`
+      }, { quoted: m });
+    }
+  }
+
+  // 2. FITUR: JPG / PNG ke PDF
+  if (subCmd === 'topdf' || subCmd === 'jpg2pdf' || subCmd === 'img2pdf') {
+    if (!isImg && !isQuotedImg) {
+      return sock.sendMessage(jid, {
+        text: `┌── [ JPG TO PDF ]\n│ • Kirim atau reply gambar dengan ${config.prefix}${cmd} untuk dijadikan file PDF\n└──`
+      }, { quoted: m });
+    }
+
+    await sock.sendMessage(jid, {
+      text: `┌── [ PROCESSING PDF ]\n│ • Engine : iLovePDF Image Converter\n│ • Status : Mengonversi gambar ke dokumen PDF...\n└──`
+    }, { quoted: m });
+
+    try {
+      const { imagesToPdf } = await import('../libs/ilovepdf.js');
+      const mediaMsg = isImg ? m : { message: quoted.raw, key: m.key };
+      const rawBuf = await downloadMediaMessage(mediaMsg, 'buffer', {});
+      const pdfBytes = await imagesToPdf([rawBuf]);
+
+      return await sock.sendMessage(jid, {
+        document: pdfBytes,
+        mimetype: 'application/pdf',
+        fileName: `ilovepdf_converted_${Date.now()}.pdf`,
+        caption: `┌── [ PDF CONVERTED ]\n│ • Ukuran : ${(pdfBytes.length / 1024).toFixed(1)} KB\n│ • Format : Dokumen PDF Siap Cetak\n└──`
+      }, { quoted: m });
+    } catch (err) {
+      return sock.sendMessage(jid, {
+        text: `┌── [ CONVERT ERROR ]\n│ • ${err.message}\n└──`
+      }, { quoted: m });
+    }
+  }
+
+  // 2. FITUR: Word ke PDF (DOCX to PDF)
+  if (subCmd === 'wordtopdf' || subCmd === 'word2pdf' || subCmd === 'doc2pdf' || subCmd === 'docx2pdf') {
+    if (!isDoc && !isQuotedDoc) {
+      return sock.sendMessage(jid, {
+        text: `┌── [ WORD TO PDF ]\n│ • Kirim atau reply file dokumen Word (.docx) dengan ${config.prefix}${cmd}\n└──`
+      }, { quoted: m });
+    }
+
+    await sock.sendMessage(jid, {
+      text: `┌── [ CONVERTING WORD ]\n│ • Engine : iLovePDF Word Engine\n│ • Status : Mengekstrak struktur & memformat ke PDF A4...\n└──`
+    }, { quoted: m });
+
+    try {
+      const { wordToPdf } = await import('../libs/ilovepdf.js');
+      const mediaMsg = isDoc ? m : { message: quoted.raw, key: m.key };
+      const rawBuf = await downloadMediaMessage(mediaMsg, 'buffer', {});
+      const pdfBytes = await wordToPdf(rawBuf);
+
+      return await sock.sendMessage(jid, {
+        document: pdfBytes,
+        mimetype: 'application/pdf',
+        fileName: `word_converted_${Date.now()}.pdf`,
+        caption: `┌── [ WORD CONVERTED ]\n│ • Format : Dokumen PDF A4 Standar\n│ • Ukuran : ${(pdfBytes.length / 1024).toFixed(1)} KB\n└──`
+      }, { quoted: m });
+    } catch (err) {
+      return sock.sendMessage(jid, {
+        text: `┌── [ WORD CONVERT ERROR ]\n│ • ${err.message}\n└──`
+      }, { quoted: m });
+    }
+  }
+
+  // 3. FITUR: Excel ke PDF (XLSX to PDF)
+  if (subCmd === 'exceltopdf' || subCmd === 'excel2pdf' || subCmd === 'xls2pdf' || subCmd === 'xlsx2pdf') {
+    if (!isDoc && !isQuotedDoc) {
+      return sock.sendMessage(jid, {
+        text: `┌── [ EXCEL TO PDF ]\n│ • Kirim atau reply file spreadsheet Excel (.xlsx/.xls/.csv) dengan ${config.prefix}${cmd}\n└──`
+      }, { quoted: m });
+    }
+
+    await sock.sendMessage(jid, {
+      text: `┌── [ CONVERTING EXCEL ]\n│ • Engine : iLovePDF Sheet Engine\n│ • Status : Menyusun tabel grid spreadsheet ke PDF Landscape...\n└──`
+    }, { quoted: m });
+
+    try {
+      const { excelToPdf } = await import('../libs/ilovepdf.js');
+      const mediaMsg = isDoc ? m : { message: quoted.raw, key: m.key };
+      const rawBuf = await downloadMediaMessage(mediaMsg, 'buffer', {});
+      const pdfBytes = await excelToPdf(rawBuf);
+
+      return await sock.sendMessage(jid, {
+        document: pdfBytes,
+        mimetype: 'application/pdf',
+        fileName: `excel_converted_${Date.now()}.pdf`,
+        caption: `┌── [ EXCEL CONVERTED ]\n│ • Format : PDF Landscape Grid Table\n│ • Ukuran : ${(pdfBytes.length / 1024).toFixed(1)} KB\n└──`
+      }, { quoted: m });
+    } catch (err) {
+      return sock.sendMessage(jid, {
+        text: `┌── [ EXCEL CONVERT ERROR ]\n│ • ${err.message}\n└──`
+      }, { quoted: m });
+    }
+  }
+
+  // Operasi yang memerlukan input file PDF
+  if (!isDoc && !isQuotedDoc) {
+    return sock.sendMessage(jid, {
+      text: `┌── [ PDF REQUIRED ]\n│ • Reply atau kirim file dokumen PDF dengan perintah ${config.prefix}${cmd}\n└──`
+    }, { quoted: m });
+  }
+
+  const mediaMsg = isDoc ? m : { message: quoted.raw, key: m.key };
+  const rawBuf = await downloadMediaMessage(mediaMsg, 'buffer', {});
+
+  // Validasi signature %PDF
+  if (rawBuf.slice(0, 4).toString() !== '%PDF') {
+    return sock.sendMessage(jid, {
+      text: `┌── [ INVALID PDF ]\n│ • File yang dikirim bukan format dokumen PDF yang valid.\n└──`
+    }, { quoted: m });
+  }
+
+  // 2. FITUR: Info PDF
+  if (subCmd === 'info' || subCmd === 'pdfinfo') {
+    try {
+      const { getPdfInfo } = await import('../libs/ilovepdf.js');
+      const info = await getPdfInfo(rawBuf);
+      return await sock.sendMessage(jid, {
+        text: `┌── [ ILOVEPDF METADATA ]\n` +
+          `│ • Total Halaman : ${info.pageCount} Hal\n` +
+          `│ • Dimensi Page  : ${info.width} x ${info.height} pt\n` +
+          `│ • Rotasi        : ${info.rotation}°\n` +
+          `│ • Judul         : ${info.title}\n` +
+          `│ • Ukuran File   : ${(rawBuf.length / 1024).toFixed(1)} KB\n` +
+          `└──`
+      }, { quoted: m });
+    } catch (err) {
+      return sock.sendMessage(jid, {
+        text: `┌── [ PDF INFO ERROR ]\n│ • ${err.message}\n└──`
+      }, { quoted: m });
+    }
+  }
+
+  // 3. FITUR: Putar PDF (Rotate)
+  if (subCmd === 'rotate' || subCmd === 'pdfrotate' || subCmd === 'putar') {
+    const angle = parseInt(param, 10) || 90;
+    await sock.sendMessage(jid, {
+      text: `┌── [ ROTATING PDF ]\n│ • Sudut  : ${angle} Derajat\n│ • Status : Memutar seluruh orientasi halaman...\n└──`
+    }, { quoted: m });
+
+    try {
+      const { rotatePdf } = await import('../libs/ilovepdf.js');
+      const rotatedBuf = await rotatePdf(rawBuf, angle);
+      return await sock.sendMessage(jid, {
+        document: rotatedBuf,
+        mimetype: 'application/pdf',
+        fileName: `rotated_${angle}deg.pdf`,
+        caption: `┌── [ ROTATE COMPLETED ]\n│ • Orientasi berhasil diputar ${angle}°\n└──`
+      }, { quoted: m });
+    } catch (err) {
+      return sock.sendMessage(jid, {
+        text: `┌── [ ROTATE ERROR ]\n│ • ${err.message}\n└──`
+      }, { quoted: m });
+    }
+  }
+
+  // 4. FITUR: Pisahkan / Ekstrak Halaman (Split)
+  if (subCmd === 'split' || subCmd === 'pdfsplit' || subCmd === 'ekstrak' || subCmd === 'extract') {
+    const range = param || '1';
+    await sock.sendMessage(jid, {
+      text: `┌── [ SPLITTING PDF ]\n│ • Halaman Target : ${range}\n│ • Status         : Mengekstrak halaman terpilih...\n└──`
+    }, { quoted: m });
+
+    try {
+      const { splitPdf } = await import('../libs/ilovepdf.js');
+      const { buffer: splitBuf, extractedPages } = await splitPdf(rawBuf, range);
+      return await sock.sendMessage(jid, {
+        document: splitBuf,
+        mimetype: 'application/pdf',
+        fileName: `extracted_pages_${extractedPages.join('_')}.pdf`,
+        caption: `┌── [ SPLIT COMPLETED ]\n│ • Halaman berhasil diekstrak : ${extractedPages.join(', ')}\n└──`
+      }, { quoted: m });
+    } catch (err) {
+      return sock.sendMessage(jid, {
+        text: `┌── [ SPLIT ERROR ]\n│ • ${err.message}\n└──`
+      }, { quoted: m });
+    }
+  }
+
+  // 5. FITUR: Hapus Halaman (Remove Pages)
+  if (subCmd === 'del' || subCmd === 'pdfdel' || subCmd === 'remove' || subCmd === 'pdfremove') {
+    if (!param) {
+      return sock.sendMessage(jid, {
+        text: `┌── [ INPUT REQUIRED ]\n│ • Masukkan nomor halaman yang ingin dihapus\n│ • Contoh : ${config.prefix}pdfdel 2 atau ${config.prefix}pdfdel 1,3-5\n└──`
+      }, { quoted: m });
+    }
+
+    await sock.sendMessage(jid, {
+      text: `┌── [ REMOVING PAGES ]\n│ • Halaman Dihapus : ${param}\n│ • Status          : Menyusun ulang dokumen...\n└──`
+    }, { quoted: m });
+
+    try {
+      const { removePdfPages } = await import('../libs/ilovepdf.js');
+      const { buffer: remBuf, remainingCount, removedList } = await removePdfPages(rawBuf, param);
+      return await sock.sendMessage(jid, {
+        document: remBuf,
+        mimetype: 'application/pdf',
+        fileName: `pages_removed.pdf`,
+        caption: `┌── [ PAGES REMOVED ]\n│ • Halaman Dihapus : ${removedList.join(', ')}\n│ • Sisa Halaman    : ${remainingCount} Hal\n└──`
+      }, { quoted: m });
+    } catch (err) {
+      return sock.sendMessage(jid, {
+        text: `┌── [ REMOVE ERROR ]\n│ • ${err.message}\n└──`
+      }, { quoted: m });
+    }
+  }
+
+  // 6. FITUR: Beri Watermark
+  if (subCmd === 'wm' || subCmd === 'pdfwm' || subCmd === 'watermark') {
+    const wmText = param || 'CONFIDENTIAL';
+    await sock.sendMessage(jid, {
+      text: `┌── [ WATERMARKING PDF ]\n│ • Tanda Air : "${wmText}"\n│ • Status    : Menerapkan cap transparan...\n└──`
+    }, { quoted: m });
+
+    try {
+      const { watermarkPdf } = await import('../libs/ilovepdf.js');
+      const wmBuf = await watermarkPdf(rawBuf, wmText);
+      return await sock.sendMessage(jid, {
+        document: wmBuf,
+        mimetype: 'application/pdf',
+        fileName: `watermarked.pdf`,
+        caption: `┌── [ WATERMARK COMPLETED ]\n│ • Teks Watermark : "${wmText}"\n└──`
+      }, { quoted: m });
+    } catch (err) {
+      return sock.sendMessage(jid, {
+        text: `┌── [ WATERMARK ERROR ]\n│ • ${err.message}\n└──`
+      }, { quoted: m });
+    }
+  }
+
+  // 7. FITUR: Beri Nomor Halaman (Page Numbers)
+  if (subCmd === 'page' || subCmd === 'pdfpage' || subCmd === 'pagenumber') {
+    await sock.sendMessage(jid, {
+      text: `┌── [ NUMBERING PDF ]\n│ • Status : Menambahkan nomor halaman di bagian bawah...\n└──`
+    }, { quoted: m });
+
+    try {
+      const { addPageNumbers } = await import('../libs/ilovepdf.js');
+      const numBuf = await addPageNumbers(rawBuf);
+      return await sock.sendMessage(jid, {
+        document: numBuf,
+        mimetype: 'application/pdf',
+        fileName: `numbered.pdf`,
+        caption: `┌── [ PAGE NUMBERING COMPLETED ]\n│ • Format : Halaman X dari Y\n└──`
+      }, { quoted: m });
+    } catch (err) {
+      return sock.sendMessage(jid, {
+        text: `┌── [ NUMBERING ERROR ]\n│ • ${err.message}\n└──`
+      }, { quoted: m });
+    }
+  }
+
+  // 8. FITUR: Kompres PDF
+  if (subCmd === 'compress' || subCmd === 'pdfcompress' || subCmd === 'kompres') {
+    await sock.sendMessage(jid, {
+      text: `┌── [ COMPRESSING PDF ]\n│ • Status : Mengoptimalkan struktur & aliran data PDF...\n└──`
+    }, { quoted: m });
+
+    try {
+      const { compressPdf } = await import('../libs/ilovepdf.js');
+      const compBuf = await compressPdf(rawBuf);
+      const diffKb = ((rawBuf.length - compBuf.length) / 1024).toFixed(1);
+      return await sock.sendMessage(jid, {
+        document: compBuf,
+        mimetype: 'application/pdf',
+        fileName: `compressed.pdf`,
+        caption: `┌── [ COMPRESS COMPLETED ]\n│ • Ukuran Awal : ${(rawBuf.length / 1024).toFixed(1)} KB\n│ • Ukuran Baru : ${(compBuf.length / 1024).toFixed(1)} KB\n│ • Penghematan : ${diffKb} KB\n└──`
+      }, { quoted: m });
+    } catch (err) {
+      return sock.sendMessage(jid, {
+        text: `┌── [ COMPRESS ERROR ]\n│ • ${err.message}\n└──`
+      }, { quoted: m });
+    }
+  }
+
+  // 9. FITUR: PDF ke Markdown (PDF to Markdown)
+  if (subCmd === 'pdf2md' || subCmd === 'pdfmarkdown' || subCmd === 'pdftomarkdown' || subCmd === 'pdfmd') {
+    await sock.sendMessage(jid, {
+      text: `┌── [ EXTRACTING MARKDOWN ]\n│ • Status : Mengekstrak aliran teks & menyusun ke format Markdown...\n└──`
+    }, { quoted: m });
+
+    try {
+      const { pdfToMarkdown } = await import('../libs/ilovepdf.js');
+      const mdContent = await pdfToMarkdown(rawBuf);
+      const mdBuffer = Buffer.from(mdContent, 'utf-8');
+
+      return await sock.sendMessage(jid, {
+        document: mdBuffer,
+        mimetype: 'text/markdown',
+        fileName: `extracted_${Date.now()}.md`,
+        caption: `┌── [ PDF TO MARKDOWN COMPLETED ]\n│ • Format : Dokumen Markdown (.md)\n│ • Ukuran : ${(mdBuffer.length / 1024).toFixed(1)} KB\n└──`
+      }, { quoted: m });
+    } catch (err) {
+      return sock.sendMessage(jid, {
+        text: `┌── [ PDF2MD ERROR ]\n│ • ${err.message}\n└──`
+      }, { quoted: m });
+    }
+  }
+
+  // Default fallback jika opsi tidak dikenali
+  return sock.sendMessage(jid, {
+    text: `┌── [ SUBCOMMAND NOT FOUND ]\n│ • Opsi "${subCmd}" tidak dikenali.\n│ • Ketik ${config.prefix}ilovepdf untuk melihat panduan lengkap.\n└──`
+  }, { quoted: m });
+}

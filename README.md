@@ -254,6 +254,8 @@ Ikuti langkah-langkah berikut untuk memasang dan menjalankan bot pada environmen
 | `.go` | `.rs`, `.java` | `<kode>` | Menjalankan kode Golang, Rust, atau Java |
 | `.iqc` | - | `<pesan\|bat\|jam>`| Membuat mockup gelembung chat iPhone Quotes |
 | `.remini` | `.hd` | `(reply foto)` | Menjernihkan resolusi foto buram menjadi HD |
+| `.removebg` | `.nobg`, `.rmbg` | `[fuzz%] (reply foto)` | Menghapus latar belakang gambar via ImageMagick |
+| `.emojimix` | `.mix`, `.emomix` | `<emot1> <emot2>` | Menggabungkan 2 emoji menjadi stiker WhatsApp |
 | `.tourl` | `.url` | `(reply media)` | Mengunggah foto/video ke tautan hosting internet |
 | `.nulis` | `.nulis2`, `.folio`| `<teks>` | Mengubah teks ketikan menjadi tulisan tangan buku |
 | `.nulisai` | - | `<topik tugas>` | AI yang otomatis mengerjakan esai & menulis di buku |
@@ -264,6 +266,19 @@ Ikuti langkah-langkah berikut untuk memasang dan menjalankan bot pada environmen
 | `.diary` | `.catatan` | `<teks>` | Menyimpan buku harian / catatan privat di bot |
 | `.del` | - | `(reply bot)` | Menghapus pesan terkirim bot secara otomatis |
 | `.text3d` | `.neon`, `.glitch`| `<teks>` | Membuat grafiti teks bergaya efek visual 3D |
+| `.ilovepdf` | `.pdf` | `<opsi> [args]` | Menampilkan panduan lengkap peralatan iLovePDF |
+| `.pdfinfo` | - | `(reply PDF)` | Memeriksa metadata, ukuran & total halaman dokumen PDF |
+| `.pdfrotate` | `.putar` | `[derajat] (reply PDF)`| Memutar rotasi halaman dokumen PDF (90, 180, 270) |
+| `.pdfsplit` | `.ekstrak` | `<rentang> (reply PDF)`| Memisahkan / mengekstrak rentang halaman PDF |
+| `.pdfdel` | `.pdfremove`| `<halaman> (reply PDF)`| Menghapus halaman tertentu dari dokumen PDF |
+| `.pdfwm` | `.watermark` | `<teks> (reply PDF)` | Menambahkan cap tanda air (watermark) transparan |
+| `.pdfpage` | `.pdfnumber` | `(reply PDF)` | Menambahkan nomor halaman otomatis di bagian bawah |
+| `.pdfcompress`| `.kompres` | `(reply PDF)` | Mengoptimalkan & memperkecil ukuran file PDF |
+| `.topdf` | `.jpg2pdf`, `.img2pdf`| `(reply foto)` | Mengonversi gambar/foto langsung ke dokumen PDF |
+| `.word2pdf` | `.doc2pdf`, `.docx2pdf`| `(reply word .docx)` | Mengonversi dokumen Microsoft Word menjadi PDF |
+| `.excel2pdf`| `.xls2pdf`, `.xlsx2pdf`| `(reply excel .xlsx)`| Mengonversi spreadsheet Excel ke tabel PDF landscape |
+| `.html2pdf` | `.htmltopdf` | `<html / url>` | Mengonversi kode HTML / link web ke dokumen PDF A4 |
+| `.pdf2md` | `.pdfmarkdown` | `(reply PDF)` | Mengekstrak teks dokumen PDF menjadi file Markdown (.md) |
 
 ### 05. Search & Anime Info
 | Perintah | Shortcut | Parameter | Deskripsi |
@@ -309,7 +324,14 @@ Ikuti langkah-langkah berikut untuk memasang dan menjalankan bot pada environmen
 | `.listgroup`| `.listadmin` | - | Menampilkan daftar grup terhubung & anggota admin |
 | `.invite` | - | `<nomor>` | Mengirimkan link undangan grup ke nomor pribadi |
 | `.getcontact`| - | `@tag` | Mengambil kontak vCard dari anggota yang ditandai |
-| `.sendcontact`| - | `<nomor> [nama]`| Mengirimkan kartu kontak nama ke ruang obrolan |
+| `.sendcontact`| `.savecontact` | `<nomor> [nama]`| Mengirimkan kartu kontak nama ke ruang obrolan |
+| `.opentime` | `.closetime` | `<waktu: 10m/1h>`| Timer buka / tutup grup otomatis |
+| `.vote` | `.upvote`, `.downvote` | `<topik>` | Membuka dan mengelola voting jajak pendapat grup |
+| `.checkvote` | `.delvote` | - | Memeriksa hasil suara atau menghapus voting aktif |
+| `.getbio` | - | `@tag` | Mengambil info bio status akun WhatsApp anggota |
+| `.getjoinrequest`| - | - | Melihat daftar permintaan bergabung (join request) grup |
+| `.react` | - | `<emoji> (reply)` | Memberikan reaksi emoji langsung ke pesan anggota |
+| `.vv` | - | `(reply view-once)`| Membuka dan melihat isi pesan View-Once media |
 
 ### 07. Group Security Shields
 | Perintah | Parameter | Deskripsi |
@@ -354,6 +376,7 @@ Ikuti langkah-langkah berikut untuk memasang dan menjalankan bot pada environmen
 | `.swirl` | `.implode` | `(reply gambar)` | Memberikan distorsi putaran atau tarikan pusat pada foto |
 | `.rotate` | `.flip`, `.flop`| `(reply gambar)` | Memutar sudut foto 90 derajat atau membalik simetris |
 | `.grayscale`| `.bw` | `(reply gambar)` | Mengubah foto berwarna menjadi hitam-putih presisi |
+| `.emojimix`| `.mix`, `.emomix`| `<emot1> <emot2>`| Menggabungkan 2 emoji menjadi stiker WhatsApp |
 | `.magick` | `.im` | `<opsi>` | Menjalankan filter ImageMagick kustom tingkat lanjut |
 
 ### 09. Religion & Spirituality
@@ -472,6 +495,8 @@ Ikuti langkah-langkah berikut untuk memasang dan menjalankan bot pada environmen
 | `.dell` | `.dellist` | `<nomor>` | Mencabut nomor pengguna dari whitelist bot |
 | `.listu` | `.whitelist` | - | Menampilkan daftar seluruh nomor yang diizinkan |
 | `.cmdstats` | `.commandstats`| - | Menampilkan statistik jumlah eksekusi masing-masing perintah |
+| `.pm2` | `.pm2status` | - | Menampilkan telemetri proses PM2 (ID, App, Restarts, RAM) |
+| `.pm2logs` | - | - | Membaca log output real-time PM2 langsung via chat WA |
 | `.restart` | `.reboot` | - | Memulai ulang proses bot otomatis tanpa memutus sesi WA |
 | `.shutdown` | `.stop`, `.matikan`| - | Menutup koneksi socket dan mematikan server bot |
 

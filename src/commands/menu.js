@@ -1,5 +1,5 @@
 import config from '../../config.js';
-import { getMenuGif } from '../libs/media.js';
+import { getMenuGif, getNsfwMenuImage } from '../libs/media.js';
 
 export async function handleMenu(sock, m, { jid, cmd, args, userName }) {
   const senderJid = m.key.participant || (m.key.fromMe ? (sock.user?.id ? sock.user.id.split(':')[0] + '@s.whatsapp.net' : jid) : jid);
@@ -15,21 +15,21 @@ export async function handleMenu(sock, m, { jid, cmd, args, userName }) {
   }
 
   const subMap = {
-    dl: 'download', down: 'download', downloader: 'download', download: 'download',
-    ai: 'ai', gpt: 'ai',
-    gm: 'game', game: 'game', games: 'game', arcade: 'game',
-    tl: 'tools', tool: 'tools', tools: 'tools', util: 'tools',
-    src: 'search', search: 'search', cari: 'search', anime: 'search',
-    gc: 'group', grup: 'group', group: 'group',
-    shield: 'shield', guard: 'shield', antilink: 'shield',
-    media: 'media', stiker: 'media', sticker: 'media', conv: 'media', converter: 'media', magick: 'media',
-    rel: 'agama', religion: 'agama', agama: 'agama', islami: 'agama',
-    dsp: 'audio', audio: 'audio', audioeffect: 'audio', efek: 'audio',
-    fn: 'fun', fun: 'fun', hiburan: 'fun', react: 'fun',
-    st: 'stalk', stalk: 'stalk', stalker: 'stalk', osint: 'stalk',
-    gal: 'gallery', galeri: 'gallery', gallery: 'gallery', pack: 'gallery',
-    nsfw: 'nsfw', 18: 'nsfw', dewasa: 'nsfw',
-    own: 'owner', owner: 'owner', sys: 'owner', system: 'owner'
+    1: 'download', dl: 'download', down: 'download', downloader: 'download', download: 'download',
+    2: 'ai', ai: 'ai', gpt: 'ai',
+    3: 'game', gm: 'game', game: 'game', games: 'game', arcade: 'game',
+    4: 'tools', tl: 'tools', tool: 'tools', tools: 'tools', util: 'tools',
+    5: 'search', src: 'search', search: 'search', cari: 'search', anime: 'search',
+    6: 'group', gc: 'group', grup: 'group', group: 'group',
+    7: 'shield', shield: 'shield', guard: 'shield', antilink: 'shield',
+    8: 'media', media: 'media', stiker: 'media', sticker: 'media', conv: 'media', converter: 'media', magick: 'media',
+    9: 'agama', rel: 'agama', religion: 'agama', agama: 'agama', islami: 'agama',
+    10: 'audio', dsp: 'audio', audio: 'audio', audioeffect: 'audio', efek: 'audio',
+    11: 'fun', fn: 'fun', fun: 'fun', hiburan: 'fun', react: 'fun', extra: 'fun', extras: 'fun', ex: 'fun',
+    12: 'stalk', st: 'stalk', stalk: 'stalk', stalker: 'stalk', osint: 'stalk',
+    13: 'gallery', gal: 'gallery', galeri: 'gallery', gallery: 'gallery', pack: 'gallery',
+    14: 'nsfw', nsfw: 'nsfw', 18: 'nsfw', dewasa: 'nsfw', bokep: 'nsfw',
+    15: 'owner', own: 'owner', owner: 'owner', sys: 'owner', system: 'owner'
   };
 
   const sub = subMap[rawSub] || null;
@@ -37,18 +37,18 @@ export async function handleMenu(sock, m, { jid, cmd, args, userName }) {
   const sections = {
     download: `┌── [ 01. DOWNLOADER ]
 │ • ${p}play <judul/url>
-│ • ${p}ytmp3 | ${p}yta <url>
-│ • ${p}ytmp4 | ${p}ytv <url>
-│ • ${p}tiktok | ${p}tt <url>
-│ • ${p}tiktokmp3 | ${p}ttmp3 <url>
-│ • ${p}ig | ${p}reel <url>
-│ • ${p}igstory | ${p}igs <user/url>
-│ • ${p}fb | ${p}facebook <url>
+│ • ${p}ytmp3 | ${p}yta | ${p}ytaudio <url>
+│ • ${p}ytmp4 | ${p}ytv | ${p}ytvideo <url>
+│ • ${p}tiktok | ${p}tt | ${p}ttdl <url>
+│ • ${p}tiktokmp3 | ${p}ttmp3 | ${p}ttaudio <url>
+│ • ${p}ig | ${p}reel | ${p}igdl <url>
+│ • ${p}igstory | ${p}igs | ${p}story <user/url>
+│ • ${p}fb | ${p}facebook | ${p}fbdl <url>
 │ • ${p}spotify | ${p}sp <judul/url>
 │ • ${p}soundcloud | ${p}sc <judul/url>
 │ • ${p}mediafire | ${p}mf <url>
 │ • ${p}sfile | ${p}sf <query/url>
-│ • ${p}snackvideo | ${p}sv <url>
+│ • ${p}snackvideo | ${p}sv | ${p}snack <url>
 │ • ${p}terabox | ${p}tb <url>
 │ • ${p}mangadl | ${p}mdl <judul> [ch]
 │ • ${p}animedl | ${p}adl <judul/link>
@@ -68,37 +68,53 @@ export async function handleMenu(sock, m, { jid, cmd, args, userName }) {
 │ • ${p}blackjack | ${p}bj [taruhan]
 │ • ${p}slot | ${p}slots
 │ • ${p}coinflip | ${p}cf [head/tail]
-│ • ${p}dadu | ${p}dice
-│ • ${p}tebakangka [angka]
-│ • ${p}sambungkata [kata]
-│ • ${p}tebakkartu [1-5]
-│ • ${p}tebaktokoh
-│ • ${p}tebakibukota
+│ • ${p}dadu | ${p}dice | ${p}rolldice
+│ • ${p}tebakangka | ${p}tangka [angka]
+│ • ${p}sambungkata | ${p}skata [kata]
+│ • ${p}tebakkartu | ${p}tkartu [1-5]
+│ • ${p}tebaktokoh | ${p}ttokoh
+│ • ${p}tebakibukota | ${p}tkota
 │ • ${p}susunkata | ${p}tebakkata
 │ • ${p}trivia | ${p}quiz
-│ • ${p}math [easy/medium/hard]
+│ • ${p}math | ${p}matematika [easy/medium/hard]
 │ • ${p}hint | ${p}clue
 └──`,
 
     tools: `┌── [ 04. TOOLS & COMPILER ]
-│ • ${p}draw | ${p}genimg | ${p}gptimage <deskripsi>
+│ • ${p}draw | ${p}genimg | ${p}aiimg <deskripsi>
 │ • ${p}c | ${p}cpp | ${p}c++ <kode c/c++ / reply>
 │ • ${p}run | ${p}code <bahasa> <kode / reply>
 │ • ${p}py | ${p}js | ${p}ts | ${p}go | ${p}rs | ${p}java <kode>
-│ • ${p}iqc <pesan | bat | kartu | jam>
-│ • ${p}remini | ${p}hd (reply foto)
+│ • ${p}php | ${p}rb | ${p}cs | ${p}kt | ${p}sh | ${p}lua | ${p}dart | ${p}swift <kode>
+│ • ${p}iqc | ${p}quotely | ${p}iphonequote <pesan | bat | kartu | jam>
+│ • ${p}remini | ${p}hd | ${p}upscale (reply foto)
+│ • ${p}removebg | ${p}nobg | ${p}rmbg [fuzz%] (reply foto)
+│ • ${p}emojimix | ${p}mix <emot1> <emot2>
 │ • ${p}tourl | ${p}url (reply media)
-│ • ${p}nulis | ${p}nulis2 | ${p}folio <teks>
+│ • ${p}nulis | ${p}nulis2 | ${p}folio | ${p}magernulis <teks>
 │ • ${p}nulisai <topik tugas>
-│ • ${p}kalender
+│ • ${p}kalender | ${p}calendar | ${p}tgl
 │ • ${p}qr | ${p}qrcode <teks/link>
-│ • ${p}tr <kode_bahasa> <teks>
-│ • ${p}tts [kode_bahasa] <teks>
+│ • ${p}tr | ${p}translate <kode_bahasa> <teks>
+│ • ${p}tts | ${p}speak [kode_bahasa] <teks>
 │ • ${p}diary | ${p}catatan <teks>
-│ • ${p}del (reply pesan bot)
+│ • ${p}del | ${p}delete (reply pesan bot)
 │ • ${p}text3d | ${p}neon | ${p}glitch | ${p}gold <teks>
 │ • ${p}fire | ${p}graffiti | ${p}blood | ${p}matrix <teks>
 │ • ${p}ice | ${p}retro <teks>
+│ • ${p}ilovepdf | ${p}pdf (panduan ilovepdf)
+│ • ${p}pdfinfo (reply pdf)
+│ • ${p}pdfrotate [derajat] (reply pdf)
+│ • ${p}pdfsplit <rentang> (reply pdf)
+│ • ${p}pdfdel | ${p}pdfremove <halaman> (reply pdf)
+│ • ${p}pdfwm | ${p}pdfwatermark <watermark> (reply pdf)
+│ • ${p}pdfpage | ${p}pdfnumber (reply pdf)
+│ • ${p}pdfcompress (reply pdf)
+│ • ${p}topdf | ${p}jpg2pdf | ${p}img2pdf (reply foto)
+│ • ${p}word2pdf | ${p}doc2pdf | ${p}wordtopdf (reply word .docx)
+│ • ${p}excel2pdf | ${p}xls2pdf | ${p}exceltopdf (reply excel .xlsx)
+│ • ${p}html2pdf | ${p}htmltopdf <html/url> (konversi html ke pdf)
+│ • ${p}pdf2md | ${p}pdfmarkdown (reply pdf ke markdown)
 └──`,
 
     search: `┌── [ 05. SEARCH & ANIME INFO ]
@@ -107,12 +123,12 @@ export async function handleMenu(sock, m, { jid, cmd, args, userName }) {
 │ • ${p}pixiv | ${p}px <query>
 │ • ${p}berita | ${p}news | ${p}br [topik]
 │ • ${p}film | ${p}movie | ${p}fm <judul>
-│ • ${p}drakor <judul>
+│ • ${p}drakor | ${p}kdrama <judul>
 │ • ${p}apk | ${p}apksearch | ${p}apks <nama app>
 │ • ${p}wiki | ${p}wikipedia | ${p}wk <query>
 │ • ${p}shazam | ${p}sz (reply audio/video)
-│ • ${p}budayabali | ${p}bbali <query>
-│ • ${p}yts | ${p}ytsearch <query>
+│ • ${p}budayabali | ${p}budaya | ${p}bbali <query>
+│ • ${p}yts | ${p}ytsearch | ${p}vsearch <query>
 │ • ${p}lirik | ${p}lyrics <judul>
 │ • ${p}chord | ${p}kunci <judul>
 │ • ${p}tiktoksearch | ${p}ttsearch <query>
@@ -127,12 +143,17 @@ export async function handleMenu(sock, m, { jid, cmd, args, userName }) {
 │ • ${p}totag (reply pesan)
 │ • ${p}linkgc | ${p}link
 │ • ${p}revoke | ${p}resetlink
-│ • ${p}kick @tag
+│ • ${p}kick | ${p}tendang @tag
 │ • ${p}add <nomor>
 │ • ${p}kickall
-│ • ${p}promote @tag | ${p}promoteall
-│ • ${p}demote @tag | ${p}demoteall
-│ • ${p}open | ${p}close
+│ • ${p}promote | ${p}admin @tag | ${p}promoteall
+│ • ${p}demote | ${p}unadmin @tag | ${p}demoteall
+│ • ${p}open | ${p}close | ${p}mute | ${p}unmute
+│ • ${p}opentime | ${p}closetime <waktu: 10m/1h>
+│ • ${p}vote <topik> | ${p}upvote | ${p}downvote
+│ • ${p}checkvote | ${p}delvote
+│ • ${p}getbio @tag (cek status/bio wa)
+│ • ${p}getjoinrequest (daftar permintaan masuk)
 │ • ${p}setname <nama baru>
 │ • ${p}setdesc <deskripsi baru>
 │ • ${p}setpp (reply foto profil grup)
@@ -142,13 +163,15 @@ export async function handleMenu(sock, m, { jid, cmd, args, userName }) {
 │ • ${p}listgroup | ${p}listadmin
 │ • ${p}invite <nomor>
 │ • ${p}getcontact @tag
-│ • ${p}sendcontact <nomor> [nama]
+│ • ${p}sendcontact | ${p}savecontact <nomor> [nama]
 │ • ${p}contactag
+│ • ${p}react <emoji> (reply pesan)
+│ • ${p}vv (reply pesan view-once)
 └──`,
 
     shield: `┌── [ 07. GROUP SECURITY SHIELDS ]
 │ • ${p}welcome on/off
-│ • ${p}antilink on/off
+│ • ${p}antilink | ${p}antilinkgc on/off
 │ • ${p}antitoxic on/off
 │ • ${p}antibot on/off
 │ • ${p}antivv on/off
@@ -165,32 +188,33 @@ export async function handleMenu(sock, m, { jid, cmd, args, userName }) {
     media: `┌── [ 08. MEDIA, STICKER & IMAGEMAGICK ]
 │ • ${p}s | ${p}sticker [pack | author]
 │ • ${p}sgif [pack | author]
-│ • ${p}brat | ${p}btext <teks>
-│ • ${p}bratg | ${p}btextg <teks>
-│ • ${p}bratb | ${p}btextb <teks>
+│ • ${p}brat | ${p}btext | ${p}brattext <teks>
+│ • ${p}bratg | ${p}btextg | ${p}bratgreen <teks>
+│ • ${p}bratb | ${p}btextb | ${p}bratblack <teks>
 │ • ${p}bratvid | ${p}bvid <teks>
 │ • ${p}toimg (reply stiker)
 │ • ${p}togif | ${p}tovideo (reply stiker bergerak)
 │ • ${p}tomp3 | ${p}getaudio (reply video/vn)
 │ • ${p}tovn | ${p}vn (reply audio/video)
 │ • ${p}rvo | ${p}readviewonce (reply view-once)
+│ • ${p}emojimix | ${p}mix | ${p}emomix <emot1> <emot2>
 │ • ${p}blur | ${p}charcoal | ${p}paint | ${p}sketch
 │ • ${p}emboss | ${p}edge | ${p}invert | ${p}sepia
 │ • ${p}swirl | ${p}implode | ${p}solarize | ${p}polaroid
 │ • ${p}oilpaint | ${p}vignette | ${p}wave | ${p}sharpen
 │ • ${p}rotate | ${p}flip | ${p}flop | ${p}mirror
-│ • ${p}grayscale | ${p}bw
-│ • ${p}magick <opsi imagemagick>
+│ • ${p}grayscale | ${p}bw | ${p}negate | ${p}blackwhite
+│ • ${p}magick | ${p}im <opsi imagemagick>
 └──`,
 
     agama: `┌── [ 09. RELIGION & SPIRITUALITY ]
-│ • ${p}quran | ${p}qrn <surah:ayat>
-│ • ${p}sholat | ${p}js [kota]
+│ • ${p}quran | ${p}alquran | ${p}qrn <surah:ayat>
+│ • ${p}sholat | ${p}jadwalsholat | ${p}js [kota]
 │ • ${p}kisahnabi | ${p}kn [nama nabi 1-25]
-│ • ${p}alkitab | ${p}bible | ${p}ktb <kitab pasal:ayat>
-│ • ${p}gita | ${p}bhagavadgita <bab:sloka>
+│ • ${p}alkitab | ${p}bible | ${p}injil | ${p}ktb <kitab pasal:ayat>
+│ • ${p}gita | ${p}bhagavadgita | ${p}hindu <bab:sloka>
 │ • ${p}doahindu [gayatri/trisandya/dll]
-│ • ${p}dhammapada | ${p}dh [nomor syair]
+│ • ${p}dhammapada | ${p}buddha | ${p}dh [nomor syair]
 └──`,
 
     audio: `┌── [ 10. AUDIO DSP FILTERS (Reply Audio) ]
@@ -215,22 +239,25 @@ export async function handleMenu(sock, m, { jid, cmd, args, userName }) {
     fun: `┌── [ 11. FUN, CHECKERS & REACTION GIF ]
 │ • ${p}define <kata/istilah>
 │ • ${p}readmore <depan | rahasia>
-│ • ${p}menfess | ${p}confess <nomor | pesan>
+│ • ${p}menfess | ${p}confess | ${p}menfes <nomor | pesan>
 │ • ${p}fact
 │ • ${p}pick <opsi 1 | opsi 2 | opsi 3>
 │ • ${p}pickupline | ${p}gombal
 │ • ${p}quotes
-│ • ${p}animequote | ${p}qanime
-│ • ${p}couple | ${p}soulmate
+│ • ${p}animequote | ${p}quoteanime | ${p}qa
+│ • ${p}couple | ${p}jodoh | ${p}soulmate
 │ • ${p}can | ${p}is | ${p}when | ${p}where | ${p}what | ${p}how | ${p}rate <tanya>
 │ • ${p}checkme
 │ • ${p}stupidcheck | ${p}handsomecheck | ${p}hotcheck | ${p}smartcheck
 │ • ${p}evilcheck | ${p}coolcheck | ${p}waifucheck | ${p}gaycheck
 │ • ${p}cutecheck | ${p}lesbiancheck | ${p}hornycheck | ${p}prettycheck
+│ • ${p}uncleancheck | ${p}greatcheck | ${p}dogcheck | ${p}uglycheck
+│ • ${p}awesomecheck | ${p}lovelycheck
 │ • ${p}hug | ${p}kiss | ${p}slap | ${p}pat | ${p}lick | ${p}bite | ${p}yeet @tag
 │ • ${p}bonk | ${p}wink | ${p}poke | ${p}nom | ${p}cry | ${p}kill | ${p}bully @tag
 │ • ${p}smile | ${p}wave | ${p}blush | ${p}dance | ${p}cuddle | ${p}highfive @tag
-│ • ${p}handhold | ${p}spank | ${p}tickle | ${p}feed | ${p}smug | ${p}cringe
+│ • ${p}handhold | ${p}spank | ${p}tickle | ${p}feed | ${p}smug | ${p}cringe @tag
+│ • ${p}glomp | ${p}happy | ${p}awoo @tag
 └──`,
 
     stalk: `┌── [ 12. OSINT STALKER ]
@@ -244,7 +271,7 @@ export async function handleMenu(sock, m, { jid, cmd, args, userName }) {
 │ • Anime   : ${p}waifu, ${p}neko, ${p}loli, ${p}husbu, ${p}shota, ${p}animerandom
 │ • Pics    : ${p}aesthetic, ${p}cat, ${p}dog, ${p}car, ${p}kpop, ${p}cosplay, ${p}rose
 │ • Wall    : ${p}wallhp, ${p}wallml, ${p}ppcouple, ${p}ulzzangboy, ${p}ulzzanggirl
-│ • TT Pics : ${p}ttkr, ${p}ttjp, ${p}ttid, ${p}tthijab, ${p}ttcn, ${p}ttth, ${p}ttvn, ${p}ttmy
+│ • TT Pics : ${p}ttkr, ${p}ttjp, ${p}ttid, ${p}tthijab, ${p}ttcn, ${p}ttth, ${p}ttvn, ${p}ttmy, ${p}ttrandom
 │ • TT Vids : ${p}ttvgirl, ${p}ttvukhty, ${p}ttvsantuy
 └──`,
 
@@ -263,15 +290,15 @@ export async function handleMenu(sock, m, { jid, cmd, args, userName }) {
 │ • ${p}nsfwboobs
 │ • ${p}nsfwneko
 │ • ${p}nsfwanal
-│ • ${p}javsearch | ${p}jav <ID/Query>
-│ • ${p}watchhentai | ${p}whentai <query>
+│ • ${p}javsearch | ${p}jav | ${p}javdb <ID/Query>
+│ • ${p}watchhentai | ${p}whentai | ${p}hentaisearch <query>
 │ • ${p}lustpress | ${p}lp | ${p}r18 [provider] <query>
-│ • ${p}xnxx | ${p}pornhub | ${p}eporner <query>
-│ • ${p}lpdl | ${p}xnxxdl | ${p}phdl <url/query> (Video 360p)
-│ • ${p}tomoe | ${p}doujin [provider] <query/code>
+│ • ${p}xnxx | ${p}pornhub | ${p}eporner | ${p}ph <query>
+│ • ${p}lpdl | ${p}xnxxdl | ${p}phdl | ${p}pornhubdl | ${p}epornerdl <url/query> (Video 360p)
+│ • ${p}tomoe | ${p}doujin | ${p}doujinshi [provider] <query/code>
 │ • ${p}nhentai | ${p}nh <code/query>
-│ • ${p}nhpdf | ${p}tomoepdf <kode>
-│ • ${p}pururin | ${p}hentaifox <code/query>
+│ • ${p}nhpdf | ${p}tomoepdf | ${p}doujinpdf <kode>
+│ • ${p}pururin | ${p}hentaifox | ${p}hfox <code/query>
 └──`,
 
     owner: `┌── [ 15. OWNER & SYSTEM MANAGEMENT ]
@@ -284,15 +311,17 @@ export async function handleMenu(sock, m, { jid, cmd, args, userName }) {
 │ • ${p}self
 │ • ${p}clearsession
 │ • ${p}block | ${p}unblock @tag
-│ • ${p}bc | ${p}broadcast <pesan>
+│ • ${p}bc | ${p}broadcast | ${p}bcgc <pesan>
 │ • ${p}signallog on/off
-│ • ${p}autoreply | ${p}ar on/off
+│ • ${p}autoreply | ${p}ar | ${p}argemini on/off
 │ • ${p}addl | ${p}addlist <nomor / @tag / reply>
 │ • ${p}dell | ${p}dellist <nomor / @tag / reply>
 │ • ${p}listu | ${p}listuser | ${p}whitelist
 │ • ${p}cmdstats | ${p}commandstats
+│ • ${p}pm2 | ${p}pm2status
+│ • ${p}pm2logs
 │ • ${p}restart | ${p}reboot
-│ • ${p}shutdown | ${p}stop
+│ • ${p}shutdown | ${p}stop | ${p}matikan
 └──`
   };
 
@@ -322,9 +351,16 @@ ENGINE   : Node.js ${process.version} // ESM
 CREATOR  : ${config.ownerName} (wa.me/${config.ownerNumber})
 `;
 
-  // Jika user meminta sub-kategori spesifik (misal: .menudl, .menugc, .menu ai)
+  // Jika user meminta sub-kategori spesifik (misal: .menudl, .menugc, .menu ai, .menu 18)
   if (sub && sections[sub]) {
-    return sendMenuReply(`${header}\n${sections[sub]}\n\nKetik ${p}menu untuk melihat seluruh daftar menu.`);
+    const captionText = `${header}\n${sections[sub]}\n\nKetik ${p}menu untuk melihat seluruh daftar menu.`;
+    if (sub === 'nsfw') {
+      const imgBuf = await getNsfwMenuImage();
+      if (imgBuf) {
+        return await sock.sendMessage(jid, { image: imgBuf, caption: captionText, mentions: [senderJid] }, { quoted: m });
+      }
+    }
+    return sendMenuReply(captionText);
   }
 
   // Tampilkan seluruh menu lengkap 100% tanpa sub-bab berbelit
