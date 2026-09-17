@@ -133,7 +133,7 @@ export async function handleMedia(sock, m, { jid, cmd, args, q, msgType, quoted 
         const mediaMsg = isVideo ? m : { message: quoted.raw, key: m.key };
         const rawBuf = await downloadMediaMessage(mediaMsg, 'buffer', {});
         const audioBuf = await convertToAudio(rawBuf, false);
-        await sock.sendMessage(jid, { audio: audioBuf, mimetype: 'audio/mp4', ptt: false, fileName: `audio_${Date.now()}.mp3` }, { quoted: m });
+        await sock.sendMessage(jid, { audio: audioBuf, mimetype: 'audio/mpeg', ptt: false, fileName: `audio_${Date.now()}.mp3` }, { quoted: m });
       } catch (err) {
         await sock.sendMessage(jid, { text: `Gagal mengonversi MP3: ${err.message}` }, { quoted: m });
       }
@@ -151,7 +151,7 @@ export async function handleMedia(sock, m, { jid, cmd, args, q, msgType, quoted 
         const mediaMsg = isMedia ? m : { message: quoted.raw, key: m.key };
         const rawBuf = await downloadMediaMessage(mediaMsg, 'buffer', {});
         const vnBuf = await convertToAudio(rawBuf, true);
-        await sock.sendMessage(jid, { audio: vnBuf, mimetype: 'audio/mp4', ptt: true }, { quoted: m });
+        await sock.sendMessage(jid, { audio: vnBuf, mimetype: 'audio/ogg; codecs=opus', ptt: true }, { quoted: m });
       } catch (err) {
         await sock.sendMessage(jid, { text: `Gagal mengonversi VN: ${err.message}` }, { quoted: m });
       }

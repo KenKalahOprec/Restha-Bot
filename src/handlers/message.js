@@ -60,7 +60,10 @@ export function unwrapMessage(m) {
 }
 
 export default async function messageHandler(sock, m) {
-  const jid = m.key.remoteJid || m.message?.deviceSentMessage?.destinationJid;
+  let jid = m.key.remoteJid;
+  if (m.key.fromMe && m.message?.deviceSentMessage?.destinationJid) {
+    jid = m.message.deviceSentMessage.destinationJid;
+  }
   if (!jid || jid === 'status@broadcast') return;
 
   const { type: msgType, body: msgBody, raw: rawMsg } = unwrapMessage(m);

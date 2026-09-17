@@ -5,7 +5,7 @@ import path from 'path';
 import os from 'os';
 import ytdlp from 'yt-dlp-exec';
 import ffmpegInstaller from '@ffmpeg-installer/ffmpeg';
-import PDFDocument from 'pdfkit';
+import { createPdfFromJpegs } from '../libs/manga.js';
 import sharp from 'sharp';
 import { searchImage, downloadVideoWithMeta } from '../libs/media.js';
 import { askAI } from '../libs/ai.js';
@@ -544,13 +544,205 @@ function fetchWatchHentaiBuffer(urlOrPath, isImage = false) {
   });
 }
 
-export async function handleWatchHentai(sock, m, { jid, q, cmd }) {
-  if (!q) {
+function whDecodeMediaUrl(s) {
+  try {
+    s = s.replace(/-/g, '+').replace(/_/g, '/');
+    while (s.length % 4) s += '=';
+    const x = Buffer.from(s, 'base64').toString('binary');
+    const k = 13;
+    let r = '';
+    for (let i = 0; i < x.length; i++) {
+      r += String.fromCharCode(x.charCodeAt(i) ^ ((k + i % 17) & 255));
+    }
+    return Buffer.from(r.split('').reverse().join(''), 'base64').toString('utf8');
+  } catch {
+    return null;
+  }
+}
+
+async function resolveWatchHentaiStream(urlOrQuery, requestedEp = null) {
+  let targetEpUrl = '';
+  let animeTitle = '';
+
+  if (/^https?:\/\/watchhentai\.net\/videos\//i.test(urlOrQuery)) {
+    targetEpUrl = urlOrQuery;
+  } else if (/^https?:\/\/watchhentai\.net\/series\//i.test(urlOrQuery)) {
+    const sBuf = await fetchWatchHentaiBuffer(urlOrQuery);
+    const sHtml = sBuf.toString('utf8');
+    const epLinks = [...new Set([...sHtml.matchAll(/href="([^"]*\/videos\/[^"]+)"/gi)].map(m => m[1]))];
+    if (!epLinks.length) throw new Error('Tidak ada episode yang ditemukan di halaman seri ini.');
+    if (requestedEp) {
+      targetEpUrl = epLinks.find(l => l.includes(`episode-${requestedEp}`)) || epLinks[0];
+    } else {
+      targetEpUrl = epLinks[0];
+    }
+  } else if (/^https?:\/\/hstorage\.xyz\//i.test(urlOrQuery)) {
+    return { streamUrl: urlOrQuery, title: 'WatchHentai Video', episodeUrl: urlOrQuery };
+  } else {
+    const sBuf = await fetchWatchHentaiBuffer(`/?s=${encodeURIComponent(urlOrQuery)}`);
+    const sHtml = sBuf.toString('utf8');
+    const articles = [...sHtml.matchAll(/<article[^>]*>([\s\S]*?)<\/article>/gi)].map(m => m[1]);
+    if (!articles.length) throw new Error(`Tidak ditemukan anime di WatchHentai untuk "${urlOrQuery}"`);
+
+    const firstArt = articles[0];
+    const link = firstArt.match(/href="([^"]+)"/i)?.[1];
+    animeTitle = firstArt.match(/alt="([^"]+)"/i)?.[1] || firstArt.match(/title="([^"]+)"/i)?.[1] || '';
+
+    if (link && link.includes('/videos/')) {
+      targetEpUrl = link;
+    } else if (link) {
+      const serBuf = await fetchWatchHentaiBuffer(link);
+      const serHtml = serBuf.toString('utf8');
+      const epLinks = [...new Set([...serHtml.matchAll(/href="([^"]*\/videos\/[^"]+)"/gi)].map(m => m[1]))];
+      if (!epLinks.length) {
+        targetEpUrl = link;
+      } else if (requestedEp) {
+        targetEpUrl = epLinks.find(l => l.includes(`episode-${requestedEp}`)) || epLinks[0];
+      } else {
+        targetEpUrl = epLinks[0];
+      }
+    } else {
+      throw new Error(`Tidak ditemukan tautan anime untuk "${urlOrQuery}"`);
+    }
+  }
+
+  const epBuf = await fetchWatchHentaiBuffer(targetEpUrl);
+  const epHtml = epBuf.toString('utf8');
+
+  const h1Match = epHtml.match(/<h1[^>]*>([\s\S]*?)<\/h1>/i);
+  if (h1Match) {
+    animeTitle = h1Match[1].replace(/<[^>]+>/g, '').replace(/&#8211;/g, '-').replace(/\s+/g, ' ').trim();
+  }
+
+  const playerUrls = [...epHtml.matchAll(/data-[a-z0-9-]*player-url="([^"]+)"/gi)].map(m => m[1]);
+
+  let streamUrl = null;
+  for (const pUrl of playerUrls) {
+    try {
+      const pBuf = await fetchWatchHentaiBuffer(pUrl);
+      const pHtml = pBuf.toString('utf8');
+      const encMatch = pHtml.match(/(?:whJwSources|whVjsSources)\s*=\s*\[\{.*?"file":"([^"]+)"/i)
+        || pHtml.match(/jw\s*=\s*\{"file":"([^"]+)"/i)
+        || pHtml.match(/"file":"([^"]+)"/i);
+      if (encMatch) {
+        const decoded = whDecodeMediaUrl(encMatch[1]);
+        if (decoded && decoded.startsWith('http')) {
+          streamUrl = decoded;
+          break;
+        }
+      }
+    } catch {}
+  }
+
+  if (!streamUrl) {
+    const directMp4 = epHtml.match(/https?:\/\/hstorage\.xyz\/files\/[^\s"'<>]+\.mp4/i)
+      || epHtml.match(/https?:\/\/[^\s"'<>]+\.(?:mp4|m3u8)/i);
+    if (directMp4) streamUrl = directMp4[0];
+  }
+
+  if (!streamUrl) {
+    throw new Error('Gagal mengekstrak tautan video dari WatchHentai');
+  }
+
+  return { streamUrl, title: animeTitle || 'WatchHentai Video', episodeUrl: targetEpUrl };
+}
+
+export async function handleWatchHentai(sock, m, { jid, q, cmd, args }) {
+  const isDl = cmd.includes('dl') || args?.includes('--dl') || (args?.[0] || '').toLowerCase() === 'dl';
+
+  if (!q && !isDl) {
     return sock.sendMessage(jid, {
-      text: `┌── [ WATCHHENTAI HELP ]\n│ • Format : ${config.prefix}${cmd} <judul/kata kunci>\n│\n│ • Contoh:\n│ • ${config.prefix}watchhentai overflow\n│ • ${config.prefix}whentai inaka\n│ • ${config.prefix}hentaisearch tsuma\n└──`
+      text: `┌── [ WATCHHENTAI HELP ]\n` +
+        `│ • Cari anime & unduh video 360p langsung dari WatchHentai\n` +
+        `│\n` +
+        `│ • Format Cari  : ${config.prefix}${cmd} <judul/kata kunci>\n` +
+        `│ • Format Unduh : ${config.prefix}whentaidl <judul / ep / link>\n` +
+        `│   (atau: ${config.prefix}${cmd} dl <judul> [ep])\n` +
+        `│\n` +
+        `│ • Contoh Cari  : ${config.prefix}whentai inaka\n` +
+        `│ • Contoh Unduh : ${config.prefix}whentaidl overflow\n` +
+        `│ • Contoh Episode: ${config.prefix}whentai dl mankitsu 2\n` +
+        `│ • Link Langsung: ${config.prefix}whentaidl https://watchhentai.net/videos/...\n` +
+        `└──`
     }, { quoted: m });
   }
 
+  // ─── MODE DOWNLOAD (360p) ───
+  if (isDl) {
+    let rawTarget = q ? q.replace(/--dl/g, '').replace(/^\s*dl\s+/i, '').replace(/\s+dl\s*$/i, '').trim() : '';
+    if (!rawTarget) {
+      return sock.sendMessage(jid, {
+        text: `┌── [ WATCHHENTAI DOWNLOADER ]\n` +
+          `│ • Masukkan judul anime atau tautan episode (360p)\n` +
+          `│\n` +
+          `│ • Contoh Judul   : ${config.prefix}whentaidl overflow\n` +
+          `│ • Contoh Episode : ${config.prefix}whentai dl mankitsu 2\n` +
+          `│ • Link Langsung  : ${config.prefix}whentaidl https://watchhentai.net/videos/...\n` +
+          `└──`
+      }, { quoted: m });
+    }
+
+    let targetQuery = rawTarget;
+    let requestedEp = null;
+
+    if (!/^https?:\/\//i.test(rawTarget)) {
+      const epMatch = rawTarget.match(/\b(?:ep|eps|episode)\s*(\d+)\b/i) || rawTarget.match(/\s+(\d+)$/);
+      if (epMatch) {
+        requestedEp = parseInt(epMatch[1], 10);
+        targetQuery = rawTarget.replace(epMatch[0], '').trim();
+      }
+    }
+
+    await sock.sendMessage(jid, {
+      text: `┌── [ EXTRACTING HENTAI ]\n│ • Target : ${targetQuery}${requestedEp ? ` (Episode ${requestedEp})` : ''}\n│ • Status : Mencari episode & stream...\n└──`
+    }, { quoted: m });
+
+    try {
+      const { streamUrl, title, episodeUrl } = await resolveWatchHentaiStream(targetQuery, requestedEp);
+
+      await sock.sendMessage(jid, {
+        text: `┌── [ DOWNLOADING 360P ]\n│ • Judul    : ${title}\n│ • Kualitas : 360p (Cepat & Hemat Kuota)\n│ • Status   : Sedang mengunduh video...\n└──`
+      }, { quoted: m });
+
+      const { buffer, meta } = await downloadAdultVideo360p(streamUrl, {
+        referer: 'https://watchhentai.net/',
+        userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+      });
+
+      const videoTitle = title || meta?.title || 'WatchHentai_Video';
+      const duration = meta?.duration_string || (meta?.duration ? `${meta.duration}s` : '-');
+      const cleanTitle = videoTitle.replace(/[\\/:*?"<>|]/g, '_').slice(0, 60);
+      const sizeMb = (buffer.length / (1024 * 1024)).toFixed(2);
+
+      const caption = `┌── [ WATCHHENTAI VIDEO 360P ]\n` +
+        `│ • Judul   : ${videoTitle}\n` +
+        `│ • Durasi  : ${duration}\n` +
+        `│ • Ukuran  : ${sizeMb} MB\n` +
+        `│ • Sumber  : ${episodeUrl}\n` +
+        `└──`;
+
+      if (buffer.length <= 64 * 1024 * 1024) {
+        return await sock.sendMessage(jid, { video: buffer, caption }, { quoted: m });
+      } else if (buffer.length <= 100 * 1024 * 1024) {
+        return await sock.sendMessage(jid, {
+          document: buffer,
+          mimetype: 'video/mp4',
+          fileName: `${cleanTitle}.mp4`,
+          caption
+        }, { quoted: m });
+      } else {
+        return await sock.sendMessage(jid, {
+          text: `┌── [ FILE LIMIT EXCEEDED ]\n│ • Ukuran video melebihi batas 100 MB (${sizeMb} MB)\n│ • Tautan Stream : ${streamUrl}\n│ • Sumber : ${episodeUrl}\n└──`
+        }, { quoted: m });
+      }
+    } catch (err) {
+      return await sock.sendMessage(jid, {
+        text: `┌── [ DOWNLOAD ERROR ]\n│ • Gagal memproses video WatchHentai\n│ • ${err.message}\n└──`
+      }, { quoted: m });
+    }
+  }
+
+  // ─── MODE PENCARIAN BIASA ───
   await sock.sendMessage(jid, {
     text: `┌── [ WATCHHENTAI ]\n│ • Mencari anime hentai "${q}"...\n└──`
   }, { quoted: m });
@@ -590,6 +782,7 @@ export async function handleWatchHentai(sock, m, { jid, q, cmd }) {
     caption += `│ • Rilis  : ${first.year}\n`;
     caption += `│ • Sensor : ${first.cens}\n`;
     caption += `│ • Link   : ${first.link}\n`;
+    caption += `│ • Unduh  : ${config.prefix}whentaidl ${first.link}\n`;
 
     if (results.length > 1) {
       caption += `│\n│ [ HASIL LAINNYA ]\n`;
@@ -617,19 +810,34 @@ export async function handleWatchHentai(sock, m, { jid, q, cmd }) {
 }
 
 // Helper download video 18+ resolusi 360p
-export async function downloadAdultVideo360p(targetUrl) {
+export async function downloadAdultVideo360p(targetUrl, customOptions = {}) {
   const tmpOut = path.join(os.tmpdir(), `adult360_${Date.now()}_${Math.random().toString(36).slice(2)}.mp4`);
   
+  const isWatchHentai = targetUrl.includes('watchhentai.net') || targetUrl.includes('hstorage.xyz');
+  const baseOptions = {
+    noPlaylist: true,
+    ...(isWatchHentai ? {
+      referer: 'https://watchhentai.net/',
+      userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+    } : {}),
+    ...customOptions
+  };
+
   let meta = null;
   try {
-    meta = await ytdlp(targetUrl, { dumpSingleJson: true, noPlaylist: true });
+    meta = await ytdlp(targetUrl, { dumpSingleJson: true, ...baseOptions });
   } catch {}
 
+  const ffmpegBin = (ffmpegInstaller?.path && fs.existsSync(ffmpegInstaller.path)) ? ffmpegInstaller.path : 'ffmpeg';
+
   await ytdlp(targetUrl, {
-    format: 'bestvideo[height<=360][ext=mp4]+bestaudio[ext=m4a]/best[height<=360][ext=mp4]/best[height<=360]/best',
-    ffmpegLocation: ffmpegInstaller.path,
+    format: '18/best[height<=360][ext=mp4]/bestvideo[height<=360][ext=mp4]+bestaudio[ext=m4a]/best[height<=360]/best',
+    ffmpegLocation: ffmpegBin,
     output: tmpOut,
-    noPlaylist: true
+    concurrentFragments: 6,
+    remuxVideo: 'mp4',
+    postprocessorArgs: ['ffmpeg:-movflags +faststart'],
+    ...baseOptions
   });
 
   const buffer = await fs.promises.readFile(tmpOut);
@@ -971,7 +1179,7 @@ export async function handleLustpress(sock, m, { jid, q, cmd, args }) {
   }
 }
 
-// Helper generator PDF nHentai
+// Helper generator PDF nHentai (Optimized & Compressed)
 async function generateNhentaiPdf(code) {
   const res = await fetch(`https://r.jina.ai/https://nhentai.net/g/${code}/1/`, {
     signal: AbortSignal.timeout(15000)
@@ -994,7 +1202,7 @@ async function generateNhentaiPdf(code) {
   const defaultExt = imgMatch[2];
 
   const pages = new Array(totalPages).fill(null);
-  const BATCH_SIZE = 5;
+  const BATCH_SIZE = 10;
 
   async function downloadPage(pageNum) {
     const exts = [defaultExt, 'webp', 'jpg', 'png'].filter((v, i, a) => a.indexOf(v) === i);
@@ -1007,9 +1215,16 @@ async function generateNhentaiPdf(code) {
         });
         if (pRes.ok) {
           const rawBuf = Buffer.from(await pRes.arrayBuffer());
-          const jpegBuf = await sharp(rawBuf).jpeg({ quality: 85 }).toBuffer();
-          const meta = await sharp(jpegBuf).metadata();
-          return { pageNum, buf: jpegBuf, width: meta.width, height: meta.height };
+          const processed = await sharp(rawBuf)
+            .resize({ width: 1080, withoutEnlargement: true })
+            .jpeg({ quality: 70, mozjpeg: true })
+            .toBuffer({ resolveWithObject: true });
+          return {
+            pageNum,
+            buffer: processed.data,
+            width: processed.info.width,
+            height: processed.info.height
+          };
         }
       } catch (e) {}
     }
@@ -1027,24 +1242,11 @@ async function generateNhentaiPdf(code) {
     }
   }
 
-  const doc = new PDFDocument({ autoFirstPage: false });
-  const chunks = [];
-  doc.on('data', c => chunks.push(c));
+  const validPages = pages.filter(Boolean);
+  if (validPages.length === 0) throw new Error('Gagal mengunduh halaman doujin');
 
-  const pdfPromise = new Promise((resolve, reject) => {
-    doc.on('end', () => resolve(Buffer.concat(chunks)));
-    doc.on('error', reject);
-  });
-
-  for (const page of pages) {
-    if (!page) continue;
-    doc.addPage({ size: [page.width, page.height], margin: 0 });
-    doc.image(page.buf, 0, 0, { width: page.width, height: page.height });
-  }
-
-  doc.end();
-  const pdfBuf = await pdfPromise;
-  return { title, totalPages, pdfBuf };
+  const pdfBuf = createPdfFromJpegs(validPages);
+  return { title, totalPages: validPages.length, pdfBuf };
 }
 
 // ─── Tomoe (R18 Doujinshi / Manga: NHentai, Pururin, HentaiFox) ─────────────

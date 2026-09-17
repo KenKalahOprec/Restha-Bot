@@ -12,6 +12,12 @@ import ffmpegInstaller from '@ffmpeg-installer/ffmpeg';
 import fs from 'fs';
 import path from 'path';
 import os from 'os';
+import { fileURLToPath } from 'url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+process.chdir(__dirname);
+
 import config from './config.js';
 import initialHandler from './src/handlers/message.js';
 import handleGroupParticipantsUpdate from './src/handlers/group.js';
@@ -168,6 +174,17 @@ async function startBot() {
     }
   });
 
+  // Selfbot wrapper: cegah drop pesan saat reply pesan sendiri di chat pribadi
+  const rawSendMessage = sock.sendMessage.bind(sock);
+  sock.sendMessage = async (targetJid, content, options = {}) => {
+    let opt = options;
+    if (opt?.quoted?.key?.fromMe && !String(targetJid).endsWith('@g.us')) {
+      const { quoted, ...restOpt } = opt;
+      opt = restOpt;
+    }
+    return rawSendMessage(targetJid, content, opt);
+  };
+
   const pairingArgIdx = process.argv.indexOf('--pairing');
   const isPairing = pairingArgIdx !== -1;
   // Allow: node index.js --pairing 628xxx  (overrides config.ownerNumber)
@@ -209,6 +226,9 @@ async function startBot() {
         } catch {}
         pairingRequested = false;
         setTimeout(startBot, 2000);
+      } else if (statusCode === DisconnectReason.connectionReplaced || statusCode === 440) {
+        logConnection('warn', 'Sesi WhatsApp aktif di proses/terminal lain (status: 440). Hentikan proses ganda.');
+        process.exit(0);
       } else {
         setTimeout(startBot, 3000);
       }
@@ -221,20 +241,19 @@ async function startBot() {
 
   const botStartTime = Math.floor(Date.now() / 1000);
 
-  sock.ev.on('messages.upsert', async ({ messages, type }) => {
-    // Abaikan sinkronisasi riwayat pesan lama dari server WhatsApp
-    if (type && type !== 'notify') return;
-
+  sock.ev.on('messages.upsert', async ({ messages }) => {
     for (const msg of messages) {
       if (!msg.message) continue;
 
-      // Abaikan pesan yang dikirim sebelum bot dinyalakan (sesi sebelum Ctrl+C / saat bot mati)
-      const msgTimestamp = typeof msg.messageTimestamp === 'number'
-        ? msg.messageTimestamp
-        : (msg.messageTimestamp?.low || 0);
+      // Abaikan pesan lama jika BUKAN dari akun sendiri (fromMe)
+      if (!msg.key?.fromMe) {
+        const msgTimestamp = typeof msg.messageTimestamp === 'number'
+          ? msg.messageTimestamp
+          : (Number(msg.messageTimestamp) || 0);
 
-      if (msgTimestamp && msgTimestamp < botStartTime) {
-        continue;
+        if (msgTimestamp && msgTimestamp < (botStartTime - 60)) {
+          continue;
+        }
       }
 
       if (msg.key?.id) {

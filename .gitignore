@@ -30,5 +30,8 @@ config.js
 Thumbs.db
 *.tmp
 *.raw
-bin/
+*.exe
+
+# Large binary tools
+bin/imagemagick/
 

@@ -4,7 +4,7 @@ import sharp from 'sharp';
  * Pure JS PDF builder from JPEG buffers (Zero external dependencies).
  * Directly embeds DCT-encoded JPEGs into PDF stream objects.
  */
-function createPdfFromJpegs(images) {
+export function createPdfFromJpegs(images) {
   const pageCount = images.length;
   if (pageCount === 0) throw new Error('Tidak ada halaman gambar untuk dijadikan PDF');
 
@@ -68,8 +68,8 @@ const UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML,
 
 async function fetchImagesBatched(rawUrls, referer) {
   const images = [];
-  const fetchLimit = rawUrls.slice(0, 45);
-  const BATCH_SIZE = 5;
+  const fetchLimit = rawUrls.slice(0, 50);
+  const BATCH_SIZE = 10;
 
   for (let i = 0; i < fetchLimit.length; i += BATCH_SIZE) {
     const batch = fetchLimit.slice(i, i + BATCH_SIZE);
@@ -79,18 +79,18 @@ async function fetchImagesBatched(rawUrls, referer) {
           const cleanUrl = encodeURI(rawUrl.trim());
           const r = await fetch(cleanUrl, {
             headers: { 'User-Agent': UA, 'Referer': referer },
-            signal: AbortSignal.timeout(7000)
+            signal: AbortSignal.timeout(9000)
           });
           if (!r.ok) return null;
-          let buf = Buffer.from(await r.arrayBuffer());
-          const meta = await sharp(buf).metadata();
-          if (meta.format !== 'jpeg') {
-            buf = await sharp(buf).jpeg({ quality: 90 }).toBuffer();
-          }
+          const rawBuf = Buffer.from(await r.arrayBuffer());
+          const processed = await sharp(rawBuf)
+            .resize({ width: 1080, withoutEnlargement: true })
+            .jpeg({ quality: 70, mozjpeg: true })
+            .toBuffer({ resolveWithObject: true });
           return {
-            buffer: buf,
-            width: meta.width || 800,
-            height: meta.height || 1200
+            buffer: processed.data,
+            width: processed.info.width,
+            height: processed.info.height
           };
         } catch {
           return null;

@@ -52,6 +52,7 @@ export async function handleMenu(sock, m, { jid, cmd, args, userName }) {
 │ • ${p}terabox | ${p}tb <url>
 │ • ${p}mangadl | ${p}mdl <judul> [ch]
 │ • ${p}animedl | ${p}adl <judul/link>
+│ • ${p}whentaidl | ${p}whentai dl <judul/link>
 └──`,
 
     ai: `┌── [ 02. COGNITIVE AI ]
@@ -292,6 +293,7 @@ export async function handleMenu(sock, m, { jid, cmd, args, userName }) {
 │ • ${p}nsfwanal
 │ • ${p}javsearch | ${p}jav | ${p}javdb <ID/Query>
 │ • ${p}watchhentai | ${p}whentai | ${p}hentaisearch <query>
+│ • ${p}whentaidl | ${p}watchhentaidl | ${p}hentaidl <query/link> (Anime 360p)
 │ • ${p}lustpress | ${p}lp | ${p}r18 [provider] <query>
 │ • ${p}xnxx | ${p}pornhub | ${p}eporner | ${p}ph <query>
 │ • ${p}lpdl | ${p}xnxxdl | ${p}phdl | ${p}pornhubdl | ${p}epornerdl <url/query> (Video 360p)

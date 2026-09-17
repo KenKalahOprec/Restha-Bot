@@ -96,10 +96,13 @@
 
 ```text
 restha-bot/
+├── bin/
+│   └── restha.js                  # CLI runner script
+├── restha.cmd                     # Windows CMD wrapper CLI
+├── restha.ps1                     # PowerShell wrapper CLI
 ├── config.js                      # Konfigurasi owner, prefix, API key, & whitelist
 ├── index.js                       # Entry point koneksi Baileys & watcher hot-reloader
 ├── package.json                   # Metadata dependensi dan skrip proyek
-├── session/                       # Direktori penyimpanan multi-file auth Baileys
 └── src/
     ├── assets/                    # File media statis, font, & template canvas
     │   ├── iqc/                   # Template & font iPhone Quotes Creator
@@ -181,7 +184,31 @@ Ikuti langkah-langkah berikut untuk memasang dan menjalankan bot pada environmen
      // ...
    };
    ```
-4. Jalankan bot:
+4. Jalankan bot via **Restha CLI Runner**:
+   ```sh
+   # Jalankan di background daemon (PM2):
+   restha start
+
+   # Jalankan langsung di terminal (Foreground / Scan QR):
+   restha run
+
+   # Hentikan bot:
+   restha stop
+
+   # Restart bot:
+   restha restart
+
+   # Hapus sesi WhatsApp & reset login QR:
+   restha delete
+
+   # Pantau log real-time:
+   restha logs
+
+   # Cek status proses:
+   restha status
+   ```
+
+   *Atau jalankan manual via Node.js:*
    ```sh
    # Mode Scan QR Code:
    node index.js
@@ -212,8 +239,9 @@ Ikuti langkah-langkah berikut untuk memasang dan menjalankan bot pada environmen
 | `.sfile` | `.sf` | `<query / link>` | Mencari & mengunduh file dari Sfile.mobi |
 | `.snackvideo` | `.sv` | `<URL SnackVideo>`| Mengunduh video tanpa watermark dari SnackVideo |
 | `.terabox` | `.tb` | `<URL TeraBox>` | Mengunduh file dari tautan penyimpanan TeraBox |
-| `.mangadl` | `.mdl` | `<judul> [ch]` | Mengunduh chapter komik/manga dalam format PDF/ZIP |
+| `.mangadl` | `.mdl` | `<judul> [ch]` | Mengunduh chapter manga PDF terkompresi (MozJPEG 1080p, hemat 85%) |
 | `.animedl` | `.adl` | `<judul / link>` | Mengunduh episode anime langsung dari Otakudesu |
+| `.whentaidl` | `.whentai dl` | `<judul / ep / link>` | Mengunduh anime hentai 360p (faststart mp4) dari WatchHentai |
 
 ### 02. Cognitive AI
 | Perintah | Shortcut | Parameter | Deskripsi |
@@ -461,6 +489,7 @@ Ikuti langkah-langkah berikut untuk memasang dan menjalankan bot pada environmen
 | `.hentai`, `.paizuri` | - | - | Gambar karya seni anime dewasa acak dari Nekobot |
 | `.javsearch` | `.jav` | `<ID/Query>` | Pencarian basis data judul, artis, & kode seri JAV |
 | `.watchhentai`| `.whentai` | `<query>` | Pencarian anime dewasa di WatchHentai beserta cover poster |
+| `.whentaidl` | `.whentai dl` | `<query / link>` | Mengunduh video anime hentai resolusi 360p dari WatchHentai |
 | `.lustpress` | `.lp`, `.r18` | `[provider] <query>` | Unified R18 video aggregator (Eporner, XNXX, PornHub) |
 | `.xnxx` | - | `<query>` | Shortcut pencarian video dewasa di database XNXX |
 | `.pornhub` | `.ph` | `<query>` | Shortcut pencarian video dewasa di database PornHub |
@@ -471,7 +500,7 @@ Ikuti langkah-langkah berikut untuk memasang dan menjalankan bot pada environmen
 | `.epornerdl`| - | `<url / query>` | Mengunduh video Eporner resolusi 360p (link langsung / cari judul) |
 | `.tomoe` | `.doujin` | `[provider] <query/code>` | Unified doujinshi aggregator (nHentai, Pururin, HentaiFox) |
 | `.nhentai` | `.nh` | `<kode / query>` | Detail & cover doujin nHentai atau pencarian 5 judul teratas |
-| `.nhpdf` | `.tomoepdf` | `<kode>` | Mengunduh seluruh halaman doujin dan mengompilasinya jadi PDF |
+| `.nhpdf` | `.tomoepdf` | `<kode>` | Mengunduh seluruh halaman doujin dan kompilasi PDF ringan (MozJPEG 1080p) |
 | `.pururin` | - | `<kode / query>` | Pencarian dan detail doujinshi dari database Pururin |
 | `.hentaifox` | `.hfox` | `<kode / query>` | Pencarian dan detail doujinshi dari database HentaiFox |
 

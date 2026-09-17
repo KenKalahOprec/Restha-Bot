@@ -517,6 +517,9 @@ export async function dispatchCommand(sock, m, context) {
     case 'watchhentai':
     case 'whentai':
     case 'hentaisearch':
+    case 'whentaidl':
+    case 'watchhentaidl':
+    case 'hentaidl':
       return handleWatchHentai(sock, m, context);
     case 'lustpress':
     case 'lp':

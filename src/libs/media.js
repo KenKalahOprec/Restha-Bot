@@ -106,6 +106,8 @@ export async function webpToMp4(buffer) {
       .outputOptions([
         '-pix_fmt', 'yuv420p',
         '-c:v', 'libx264',
+        '-preset', 'ultrafast',
+        '-threads', '0',
         '-movflags', '+faststart',
         '-vf', 'scale=trunc(iw/2)*2:trunc(ih/2)*2'
       ])
@@ -169,6 +171,7 @@ export async function videoToAnimatedWebp(buffer, pack = 'Restha Bot', author = 
         '-loop', '0',
         '-an',
         '-vsync', '0',
+        '-threads', '0',
         '-s', '512:512'
       ])
       .save(tmpOut)
@@ -191,16 +194,24 @@ export async function videoToAnimatedWebp(buffer, pack = 'Restha Bot', author = 
 
 export async function convertToAudio(buffer, isVn = false) {
   const tmpIn = path.join(os.tmpdir(), `media_${Date.now()}_${Math.random().toString(36).slice(2)}`);
-  const ext = isVn ? 'opus' : 'mp3';
+  const ext = isVn ? 'ogg' : 'mp3';
   const tmpOut = path.join(os.tmpdir(), `audio_${Date.now()}_${Math.random().toString(36).slice(2)}.${ext}`);
   await fs.promises.writeFile(tmpIn, buffer);
 
   return new Promise((resolve, reject) => {
     let proc = ffmpeg(tmpIn).noVideo();
     if (isVn) {
-      proc.audioCodec('libopus').audioBitrate(64);
+      proc
+        .audioCodec('libopus')
+        .audioChannels(1)
+        .audioFrequency(48000)
+        .audioBitrate(48)
+        .outputOptions(['-vn']);
     } else {
-      proc.audioCodec('libmp3lame').audioBitrate(128);
+      proc
+        .audioCodec('libmp3lame')
+        .audioBitrate(128)
+        .outputOptions(['-preset', 'ultrafast', '-threads', '0']);
     }
     proc
       .save(tmpOut)
@@ -325,11 +336,13 @@ export async function downloadVideoWithMeta(url) {
   } catch {}
 
   await ytdlp(query, {
-    format: 'bestvideo[height<=720][ext=mp4]+bestaudio[ext=m4a]/best[height<=720][ext=mp4]/best[height<=720]/best',
+    format: '22/18/best[height<=720][ext=mp4]/bestvideo[height<=720][ext=mp4]+bestaudio[ext=m4a]/best[height<=720]/best',
     ffmpegLocation: FFMPEG_BIN,
     output: tmpOut,
     noPlaylist: true,
-    concurrentFragments: 4
+    concurrentFragments: 6,
+    remuxVideo: 'mp4',
+    postprocessorArgs: ['ffmpeg:-movflags +faststart']
   });
   const buf = await fs.promises.readFile(tmpOut);
   await fs.promises.unlink(tmpOut).catch(() => {});
@@ -347,11 +360,13 @@ export async function downloadAnime360p(url) {
   } catch {}
 
   await ytdlp(query, {
-    format: 'bestvideo[height<=360][ext=mp4]+bestaudio[ext=m4a]/best[height<=360][ext=mp4]/best[height<=360]/best',
+    format: '18/best[height<=360][ext=mp4]/bestvideo[height<=360][ext=mp4]+bestaudio[ext=m4a]/best[height<=360]/best',
     ffmpegLocation: FFMPEG_BIN,
     output: tmpOut,
     noPlaylist: true,
-    concurrentFragments: 4
+    concurrentFragments: 6,
+    remuxVideo: 'mp4',
+    postprocessorArgs: ['ffmpeg:-movflags +faststart']
   });
   const buf = await fs.promises.readFile(tmpOut);
   await fs.promises.unlink(tmpOut).catch(() => {});
@@ -376,7 +391,8 @@ export async function downloadMediaPlaylist(url) {
     await ytdlp(url, {
       ffmpegLocation: FFMPEG_BIN,
       output: outPattern,
-      concurrentFragments: 4
+      concurrentFragments: 6,
+      postprocessorArgs: ['ffmpeg:-movflags +faststart']
     });
   } catch (err) {
     // yt-dlp returns non-zero status when downloading mixed media/partial items,
@@ -437,11 +453,11 @@ export async function downloadAudioUrl(url) {
   const query = isUrl ? url : `ytsearch1:${url}`;
   const tmpOut = path.join(os.tmpdir(), `audio_${Date.now()}_${Math.random().toString(36).slice(2)}.m4a`);
   const dlOptions = {
-    format: 'bestaudio[ext=m4a]/bestaudio/best',
+    format: '140/bestaudio[ext=m4a]/bestaudio/best',
     ffmpegLocation: FFMPEG_BIN,
     output: tmpOut,
     noPlaylist: true,
-    concurrentFragments: 4
+    concurrentFragments: 6
   };
 
   try {
@@ -456,7 +472,7 @@ export async function downloadAudioUrl(url) {
         ffmpegLocation: FFMPEG_BIN,
         output: tmpOut,
         noPlaylist: true,
-        concurrentFragments: 4
+        concurrentFragments: 6
       });
     }
   }
