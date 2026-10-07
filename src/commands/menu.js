@@ -88,6 +88,7 @@ export async function handleMenu(sock, m, { jid, cmd, args, userName }) {
 │ • ${p}py | ${p}js | ${p}ts | ${p}go | ${p}rs | ${p}java <kode>
 │ • ${p}php | ${p}rb | ${p}cs | ${p}kt | ${p}sh | ${p}lua | ${p}dart | ${p}swift <kode>
 │ • ${p}iqc | ${p}quotely | ${p}iphonequote <pesan | bat | kartu | jam>
+│ • ${p}blackpink | ${p}bp | ${p}bpmaker <teks>
 │ • ${p}remini | ${p}hd | ${p}upscale (reply foto)
 │ • ${p}removebg | ${p}nobg | ${p}rmbg [fuzz%] (reply foto)
 │ • ${p}emojimix | ${p}mix <emot1> <emot2>

@@ -12,9 +12,12 @@ const INDEX_FILE = path.join(ROOT_DIR, 'index.js');
 
 const action = (process.argv[2] || 'help').toLowerCase();
 
-function runCmd(cmd) {
+const nullDevice = process.platform === 'win32' ? '2>nul' : '2>/dev/null';
+
+function runCmd(cmd, { silentError = false } = {}) {
+  const finalCmd = silentError ? `${cmd} ${nullDevice} || exit 0` : cmd;
   return new Promise((resolve) => {
-    const proc = spawn(cmd, { cwd: ROOT_DIR, stdio: 'inherit', shell: true });
+    const proc = spawn(finalCmd, { cwd: ROOT_DIR, stdio: 'inherit', shell: true });
     proc.on('exit', (code) => resolve(code ?? 0));
   });
 }
@@ -23,7 +26,7 @@ switch (action) {
   case 'start': {
     const extraArgs = process.argv.slice(3).join(' ');
     console.log('[RESTHA] Menyiapkan instance bot di background (PM2)...');
-    await runCmd('npx pm2 delete restha');
+    await runCmd('npx pm2 delete restha', { silentError: true });
     await runCmd(`npx pm2 start "${INDEX_FILE}" --name restha --cwd "${ROOT_DIR}" ${extraArgs ? '-- ' + extraArgs : ''}`);
     break;
   }
@@ -31,15 +34,15 @@ switch (action) {
   case 'run':
   case 'dev': {
     const extraArgs = process.argv.slice(3).join(' ');
-    await runCmd('npx pm2 stop restha');
-    console.log('[RESTHA] Menjalankan bot langsung di foreground...');
+    await runCmd('npx pm2 stop restha', { silentError: true });
+    console.log('[RESTHA] Menjalankan bot langsung di foreground (Scan QR)...');
     await runCmd(`node "${INDEX_FILE}" ${extraArgs}`);
     break;
   }
 
   case 'stop':
     console.log('[RESTHA] Menghentikan bot (PM2)...');
-    await runCmd('npx pm2 stop restha');
+    await runCmd('npx pm2 stop restha', { silentError: true });
     break;
 
   case 'restart':
@@ -62,7 +65,7 @@ switch (action) {
   case 'clearsession':
   case 'clean': {
     console.log('[RESTHA] Menghentikan bot (PM2) sebelum menghapus session...');
-    await runCmd('npx pm2 stop restha');
+    await runCmd('npx pm2 stop restha', { silentError: true });
 
     const sessionDirs = [
       process.env.SESSION_DIR || path.join(os.homedir(), '.restha-session'),

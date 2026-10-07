@@ -1066,3 +1066,58 @@ export async function removeBackground(buffer, fuzzPercent = 20) {
   ];
   return await applyImageMagick(buffer, magickArgs, 'png');
 }
+
+let bpFontBase64Cache = null;
+
+export async function createBlackpinkLogo(text) {
+  const fontPath = path.resolve('src/assets/blackpink/blackpink.otf');
+  if (!bpFontBase64Cache && fs.existsSync(fontPath)) {
+    bpFontBase64Cache = (await fs.promises.readFile(fontPath)).toString('base64');
+  }
+
+  const cleanText = (text || 'BLACKPINK').trim().toUpperCase();
+  const charWidth = 140;
+  const textWidth = Math.max(300, Math.ceil(cleanText.length * charWidth));
+  const innerBoxW = textWidth + 100;
+  const innerBoxH = 230;
+  const borderWidth = 10;
+  const outerMargin = 160;
+
+  const totalW = innerBoxW + 20 + (outerMargin * 2);
+  const totalH = innerBoxH + 20 + (outerMargin * 2);
+
+  const frameX = outerMargin;
+  const frameY = outerMargin;
+  const frameW = innerBoxW + 20;
+  const frameH = innerBoxH + 20;
+
+  const escapedText = cleanText
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+
+  const svg = `<svg width="${totalW}" height="${totalH}" viewBox="0 0 ${totalW} ${totalH}" xmlns="http://www.w3.org/2000/svg">
+    <defs>
+      <style>
+        ${bpFontBase64Cache ? `@font-face {
+          font-family: 'BlackpinkFont';
+          src: url('data:font/otf;charset=utf-8;base64,${bpFontBase64Cache}');
+        }` : ''}
+        .bp-text {
+          font-family: 'BlackpinkFont', sans-serif;
+          font-size: 230px;
+          fill: #FF94E0;
+          text-anchor: middle;
+          dominant-baseline: central;
+        }
+      </style>
+    </defs>
+    <rect width="100%" height="100%" fill="#000000"/>
+    <rect x="${frameX + borderWidth / 2}" y="${frameY + borderWidth / 2}" width="${frameW - borderWidth}" height="${frameH - borderWidth}" fill="none" stroke="#FF94E0" stroke-width="${borderWidth}"/>
+    <text x="${totalW / 2}" y="${(totalH / 2) + 6}" class="bp-text">${escapedText}</text>
+  </svg>`;
+
+  return await sharp(Buffer.from(svg)).png().toBuffer();
+}
+

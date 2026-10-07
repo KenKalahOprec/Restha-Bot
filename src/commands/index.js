@@ -55,7 +55,8 @@ import {
   handleTextEffect,
   handleDraw,
   handleRemoveBg,
-  handleILovePdf
+  handleILovePdf,
+  handleBlackpink
 } from './tools.js';
 import {
   handleGoogle,
@@ -354,6 +355,10 @@ export async function dispatchCommand(sock, m, context) {
     case 'quotely':
     case 'iphonequote':
       return handleIqc(sock, m, context);
+    case 'blackpink':
+    case 'bp':
+    case 'bpmaker':
+      return handleBlackpink(sock, m, context);
     case 'nulis':
     case 'nulis1':
     case 'nulis2':

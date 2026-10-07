@@ -8,7 +8,8 @@ import {
   generateNulisImage,
   generateNulisBookImage,
   uploadToCatbox,
-  removeBackground
+  removeBackground,
+  createBlackpinkLogo
 } from '../libs/media.js';
 import { askAI } from '../libs/ai.js';
 
@@ -119,6 +120,35 @@ export async function handleIqc(sock, m, { jid, q, cmd, quoted, userName }) {
     await sock.sendMessage(jid, { image: iqcBuf, caption: '📱 *iPhone Quoted Chat (IQC)*' }, { quoted: m });
   } catch (err) {
     await sock.sendMessage(jid, { text: `Gagal membuat quote iPhone: ${err.message}` }, { quoted: m });
+  }
+}
+
+export async function handleBlackpink(sock, m, { jid, q, cmd, quoted }) {
+  const text = (q || quoted?.body?.text || quoted?.raw?.conversation || '').trim();
+  if (!text) {
+    return sock.sendMessage(jid, {
+      text: `┌── [ BLACKPINK LOGO MAKER ]\n` +
+        `│ • Gunakan: *${config.prefix}${cmd} <teks>*\n` +
+        `│ • Contoh: *${config.prefix}${cmd} BLACKPINK*\n` +
+        `│ • Contoh: *${config.prefix}bp RESTHA BOT*\n` +
+        `└──`
+    }, { quoted: m });
+  }
+
+  await sock.sendMessage(jid, {
+    text: `┌── [ PROCESSING BLACKPINK ]\n│ • Status : Sedang merender logo Blackpink...\n└──`
+  }, { quoted: m });
+
+  try {
+    const bpBuffer = await createBlackpinkLogo(text);
+    await sock.sendMessage(jid, {
+      image: bpBuffer,
+      caption: `┌── [ BLACKPINK LOGO MAKER ]\n│ • Teks   : ${text.toUpperCase()}\n│ • Status : Sukses dibuat\n└──`
+    }, { quoted: m });
+  } catch (err) {
+    await sock.sendMessage(jid, {
+      text: `┌── [ BLACKPINK ERROR ]\n│ • Gagal merender logo: ${err.message}\n└──`
+    }, { quoted: m });
   }
 }
 
